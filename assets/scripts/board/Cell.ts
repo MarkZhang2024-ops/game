@@ -109,7 +109,7 @@ export class Cell extends Component {
     private applyTileArt(): void {
         const sprite = this.colorSprite;
         if (!sprite || this.cellSize <= 0) return;
-        const inset = Math.max(4, Math.round(this.cellSize * 0.06));
+        const inset = LAYOUT.cellGap;
         const visual = Math.max(8, this.cellSize - inset * 2);
         const ut = sprite.node.getComponent(UITransform);
         ut?.setContentSize(visual, visual);
@@ -145,7 +145,7 @@ export class Cell extends Component {
             ut.setContentSize(this.cellSize, this.cellSize);
         }
         if (colorNode) {
-            colorNode.getComponent(UITransform)!.setContentSize(Math.max(8, this.cellSize - 8), Math.max(8, this.cellSize - 8));
+            colorNode.getComponent(UITransform)!.setContentSize(Math.max(8, this.cellSize - LAYOUT.cellGap * 2), Math.max(8, this.cellSize - LAYOUT.cellGap * 2));
         }
     }
 

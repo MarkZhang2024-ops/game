@@ -34,7 +34,8 @@ import { LevelComplete } from '../ui/LevelComplete';
 import { GameOver } from '../ui/GameOver';
 import { SettingsPanel } from '../ui/SettingsPanel';
 import { PuzzleSolver } from '../puzzle/PuzzleSolver';
-import { createBoardData, cloneBoard, countSuspects } from '../puzzle/PuzzleTypes';
+import { findUniqueNextMoves } from '../puzzle/UniqueReasoning';
+import { createBoardData, cloneBoard, countSuspects, BoardData } from '../puzzle/PuzzleTypes';
 import { GAME, CellMarkState, SuspectType } from '../utils/Constants';
 import { applyGamePageLayout, findDeep } from '../ui/GamePageLayout';
 import { applySpriteFrame } from '../ui/GameArt';
@@ -66,6 +67,7 @@ export class GameManager extends Component {
     private hintEmptyBanner: Node | null = null;
     private hintPopup: HintPopup | null = null;
     private hintOpen = false;
+    private nextUniqueMove: { row: number; col: number; colorId: number } | null = null;
     private hintHighlights: { row: number; col: number }[] = [];
     private lastClickedRow = -1;
     private lastClickedCol = -1;
@@ -311,6 +313,7 @@ export class GameManager extends Component {
                 }
                 view.removeSuspect(row, col);
                 this.refreshProgress();
+                if (this.isNewSuspectRuleEnabled()) this.syncNextUniqueMove();
                 break;
             default:
                 break;
@@ -325,6 +328,11 @@ export class GameManager extends Component {
         if (!cell) return;
         if (cell.getSuspectType() === SuspectType.SYSTEM) return;
         if (cell.getMarkState() === CellMarkState.SUSPECT) return;
+
+        if (this.isNewSuspectRuleEnabled()) {
+            this.placeUniqueNextSuspect(row, col);
+            return;
+        }
 
         if (!PuzzleSolver.canPlace(board, row, col)) {
             view.shakeCell(row, col);
@@ -383,6 +391,7 @@ export class GameManager extends Component {
             console.error('[GameManager] Board data missing');
             return;
         }
+        if (this.isNewSuspectRuleEnabled()) this.hideAllSuspects(boardData);
 
         const canvas = this.canvas();
         if (canvas) applyGamePageLayout(canvas, true);
@@ -407,6 +416,7 @@ export class GameManager extends Component {
         this.hud?.setHearts(this.state.lives, this.state.maxLives);
         this.hud?.setHintsLeft(this.state.hints);
         this.refreshProgress();
+        if (this.isNewSuspectRuleEnabled()) this.syncNextUniqueMove();
     }
 
     private refreshProgress(): void {
@@ -414,9 +424,61 @@ export class GameManager extends Component {
         this.hud?.setProgress(countSuspects(this.state.board), this.state.getRequiredSuspectCount());
     }
 
+    private isNewSuspectRuleEnabled(): boolean {
+        return this.state.currentLevel >= 11;
+    }
+
+    /** Level 11+ starts with no suspect drawn. Levels 1-10 never call this. */
+    private hideAllSuspects(board: BoardData): void {
+        for (const row of board.cells) {
+            for (const cell of row) {
+                cell.hasSuspect = false;
+                cell.locked = false;
+            }
+        }
+    }
+
+    private syncNextUniqueMove(): void {
+        const board = this.state.board;
+        if (!this.isNewSuspectRuleEnabled() || !board || PuzzleSolver.isComplete(board)) {
+            this.nextUniqueMove = null;
+            return;
+        }
+        const moves = findUniqueNextMoves(board);
+        this.nextUniqueMove = moves.length === 1 ? moves[0] : null;
+    }
+
+    private placeUniqueNextSuspect(row: number, col: number): void {
+        const board = this.state.board;
+        const view = this.board;
+        if (!board || !view) return;
+        const cell = view.getCell(row, col);
+        if (!cell) return;
+        this.syncNextUniqueMove();
+        const move = this.nextUniqueMove;
+        const colorId = board.cells[row][col].color;
+        if (!move || row !== move.row || col !== move.col || colorId !== move.colorId) {
+            view.shakeCell(row, col);
+            this.showToast('Illegal placement');
+            this.loseLife();
+            return;
+        }
+        board.cells[row][col].hasSuspect = true;
+        cell.setMarkState(CellMarkState.SUSPECT, SuspectType.PLAYER, true);
+        this.refreshProgress();
+        this.syncNextUniqueMove();
+        if (PuzzleSolver.isComplete(board)) {
+            this.onLevelCompleted();
+        }
+    }
+
     private onTool(): void {
         if (this.hintOpen || this.state.levelCompleted || this.state.lives <= 0) return;
         if (!this.state.board || !this.board) return;
+        if (this.isNewSuspectRuleEnabled()) {
+            this.flashUniqueMove();
+            return;
+        }
         const pos = HintManager.pickAvailableSuspect(this.state.board);
         if (!pos) {
             this.showToast('No suspect available');
@@ -436,6 +498,10 @@ export class GameManager extends Component {
             return;
         }
         if (this.hintOpen || !this.state.board || !this.board) return;
+        if (this.isNewSuspectRuleEnabled()) {
+            this.hintUniqueMove();
+            return;
+        }
         const hint = HintManager.findHint(this.state.board, (row, col) => this.canMarkExcluded(row, col));
         if (!hint) {
             this.showToast('No hint available');
@@ -455,6 +521,46 @@ export class GameManager extends Component {
         this.board.setInputEnabled(false);
         this.hintPopup?.show(hint.reason, () => this.onHintContinue());
         this.refreshProgress();
+    }
+
+    /**
+     * Level 11+ Hint button: show the solver's next cell, then return the cell to normal.
+     * Does not place a suspect.
+     */
+    private hintUniqueMove(): void {
+        if (!this.state.board || !this.board) return;
+        this.syncNextUniqueMove();
+        const move = this.nextUniqueMove;
+        if (!move) {
+            this.showToast('No hint available');
+            return;
+        }
+        this.state.hints--;
+        this.hud?.setHintsLeft(this.state.hints);
+        this.unschedule(this.restoreHintFlash);
+        this.clearHintHighlights();
+        this.highlightHint(move.row, move.col);
+        this.scheduleOnce(this.restoreHintFlash, 1.2);
+    }
+
+    private restoreHintFlash = (): void => {
+        this.clearHintHighlights();
+    };
+
+    /** Brief ring on the unique cell. Does not place a suspect. */
+    private flashUniqueMove(): void {
+        if (!this.board) return;
+        this.syncNextUniqueMove();
+        const move = this.nextUniqueMove;
+        if (!move) {
+            this.showToast('No suspect available');
+            return;
+        }
+        const cell = this.board.getCell(move.row, move.col);
+        cell?.setHintHighlight(true);
+        this.scheduleOnce(() => {
+            if (!this.hintOpen) cell?.setHintHighlight(false);
+        }, 0.6);
     }
 
     private canMarkExcluded(row: number, col: number): boolean {
@@ -488,6 +594,7 @@ export class GameManager extends Component {
     }
 
     private dismissRuleHint(): void {
+        this.unschedule(this.restoreHintFlash);
         this.clearHintHighlights();
         this.hintOpen = false;
         this.board?.setInputEnabled(true);

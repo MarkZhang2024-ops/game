@@ -377,7 +377,8 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     dressDimmer(findDeep(canvas, 'GameOver'));
     dressDimmer(findDeep(canvas, 'SettingsPanel'));
 
-    const topBtn = m.topButton * unit;
+    const buttonScale = 2 / 3;
+    const topBtn = m.topButton * unit * buttonScale;
     const topY = sh / 2 - m.topRowFromTop * unit;
     const top = findDeep(canvas, 'TopUI');
     setSize(top, sw, topBtn + 16 * unit);
@@ -422,10 +423,11 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     const bottom = findDeep(canvas, 'BottomUI');
     setSize(bottom, sw, bottomH + 20 * unit);
     place(bottom, 0, bottomY, safeX, safeY);
-    const btnW = m.bottomButtonWidth * unit;
+    const btnW = m.bottomButtonWidth * unit * buttonScale;
+    const btnH = m.bottomButtonHeight * unit * buttonScale;
     const halfSpan = m.bottomButtonSpacing * unit * 0.5;
-    setSize(findDeep(bottom, 'HintButton'), btnW, bottomH);
-    setSize(findDeep(bottom, 'ToolButton'), btnW, bottomH);
+    setSize(findDeep(bottom, 'HintButton'), btnW, btnH);
+    setSize(findDeep(bottom, 'ToolButton'), btnW, btnH);
     at(findDeep(bottom, 'HintButton'), -halfSpan, 0);
     at(findDeep(bottom, 'ToolButton'), halfSpan, 0);
     if (bottom?.parent) bottom.setSiblingIndex(bottom.parent.children.length - 1);

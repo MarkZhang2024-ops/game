@@ -94,7 +94,7 @@ export const LAYOUT = {
     ruleBarHeight: 150,
     statusBarHeight: 110,
     bottomBarHeight: 180,
-    cellGap: 8,
+    cellGap: 1,
     cellRadiusRatio: 0.22,
     boardPadding: 24,
     boardRadius: 36,

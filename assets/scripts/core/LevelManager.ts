@@ -6,7 +6,14 @@
 
 import { getHandcraftedLevel, LEVEL_4 } from '../puzzle/LevelData';
 import { PuzzleGenerator } from '../puzzle/PuzzleGenerator';
-import { LevelConfig } from '../puzzle/PuzzleTypes';
+import {
+    findUniqueNextMoves,
+    logAcceptedUniqueLevel,
+    logGeneratedColors,
+    logInvalidLevel,
+    logOpenPuzzle,
+} from '../puzzle/UniqueReasoning';
+import { LevelConfig, countSuspects, createBoardData } from '../puzzle/PuzzleTypes';
 import { SaveManager } from './SaveManager';
 import {
     LeaderboardTierDisplay,
@@ -24,6 +31,9 @@ export class LevelManager {
     private static targetLevel: number | null = null;
 
     private playingLevel = 1;
+    /** Seed for the level currently open. Used only when level >= 11. */
+    private openSeed: number | null = null;
+    private openSeedLevel = 0;
 
     constructor() {
         const target = LevelManager.takeTargetLevel();
@@ -151,8 +161,31 @@ export class LevelManager {
         return this.playingLevel;
     }
 
-    public loadLevel(level: number): LevelConfig {
+    public loadLevel(level: number, reuseSeed = false): LevelConfig {
         this.playingLevel = Math.max(1, Math.floor(level) || 1);
+        if (this.playingLevel <= 10) {
+            const unique = PuzzleGenerator.generateUniqueReasoningLevel(5, this.playingLevel);
+            if (unique?.solutionPath && unique.solutionPath.length > 0) {
+                logGeneratedColors(this.playingLevel, unique.colorGrid);
+                logAcceptedUniqueLevel(this.playingLevel, unique.solutionPath);
+                return { ...unique, level: this.playingLevel };
+            }
+            logInvalidLevel('empty');
+            console.warn(
+                '[UniqueReasoning] generation exceeded 1000 attempts. Adjusting generation parameters and retrying.',
+            );
+            const retry = PuzzleGenerator.generateUniqueReasoningLevel(5, this.playingLevel);
+            if (retry?.solutionPath && retry.solutionPath.length > 0) {
+                logGeneratedColors(this.playingLevel, retry.colorGrid);
+                logAcceptedUniqueLevel(this.playingLevel, retry.solutionPath);
+                return { ...retry, level: this.playingLevel };
+            }
+            logInvalidLevel('empty');
+            throw new Error('[UniqueReasoning] INVALID LEVEL');
+        }
+        if (this.playingLevel >= 11) {
+            return this.loadOpenUniqueLevel(reuseSeed);
+        }
         const size = LevelManager.getBoardSize(this.playingLevel);
         const handcrafted = getHandcraftedLevel(this.playingLevel);
         if (handcrafted && handcrafted.rows === size && handcrafted.cols === size) {
@@ -180,7 +213,40 @@ export class LevelManager {
     }
 
     public restartLevel(): LevelConfig {
-        return this.loadLevel(this.playingLevel);
+        return this.loadLevel(this.playingLevel, this.playingLevel >= 11);
+    }
+
+    /** Level 11+. New seed on a new level. Restart keeps the seed and still shows no suspect. */
+    private loadOpenUniqueLevel(reuseSeed: boolean): LevelConfig {
+        const size = LevelManager.getBoardSize(this.playingLevel);
+        const seed = this.seedForOpenLevel(reuseSeed);
+        const generated = PuzzleGenerator.generateOpenUniqueLevel(size, seed, this.playingLevel);
+        if (generated?.nextUniqueMove && generated.solution) {
+            const board = createBoardData(generated);
+            logOpenPuzzle(
+                this.playingLevel,
+                generated.solution,
+                generated.initialSuspects ?? [],
+                generated.nextUniqueMove,
+                countSuspects(board),
+                findUniqueNextMoves(board).length,
+            );
+            return generated;
+        }
+        logInvalidLevel('empty');
+        console.warn(
+            '[UniqueReasoning] generation exceeded 1000 attempts. Adjusting generation parameters and retrying.',
+        );
+        throw new Error('[UniqueReasoning] INVALID LEVEL');
+    }
+
+    private seedForOpenLevel(reuseSeed: boolean): number {
+        if (reuseSeed && this.openSeed != null && this.openSeedLevel === this.playingLevel) {
+            return this.openSeed;
+        }
+        this.openSeed = (Math.floor(Math.random() * 0x7ffffffe) + 1) >>> 0;
+        this.openSeedLevel = this.playingLevel;
+        return this.openSeed;
     }
 
     public completeLevel(level: number): void {
