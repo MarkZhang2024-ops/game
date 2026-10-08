@@ -5,7 +5,7 @@
 import { _decorator, Color, Component, Label, Node, Sprite, UITransform } from 'cc';
 import { LeaderboardEntry } from '../data/LeaderboardData';
 import { avatarFrame } from './AvatarConfig';
-import { fillDigits, rowFrame, showFrame, starFrame } from './LeaderboardArt';
+import { fillDigits, layoutLevelColumn, rowFrame, showFrame, starFrame } from './LeaderboardArt';
 import { profileAvatar } from './ProfileAvatars';
 import { addLabel, uiNode } from './UiKit';
 
@@ -42,6 +42,13 @@ export class LeaderboardItem extends Component {
         this.paint();
     }
 
+    /** Draw the name and level again after the row is in the scroll view. */
+    public repaint(): void {
+        if (!this.entry) return;
+        this.layout();
+        this.paint();
+    }
+
     private ensure(): void {
         if (this.built) return;
         this.built = true;
@@ -63,16 +70,21 @@ export class LeaderboardItem extends Component {
         avatar.setParent(this.node);
         this.avatar = avatar.addComponent(Sprite);
 
+        this.levelDigits = uiNode('LevelDigits', 80, 40);
+        this.levelDigits.setParent(this.node);
+
         this.nameLabel = addLabel(this.node, 'PlayerName', '', 34, NAME_COLOR, 420, 70);
         this.nameLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        this.nameLabel.enableWrapText = false;
+        this.nameLabel.cacheMode = Label.CacheMode.BITMAP;
         this.nameLabel.node.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
 
         this.levelCaption = addLabel(this.node, 'LevelCaption', 'Level', 22, NAME_COLOR, 140, 32);
-        this.levelCaption.horizontalAlign = Label.HorizontalAlign.RIGHT;
-        this.levelCaption.node.getComponent(UITransform)?.setAnchorPoint(1, 0.5);
-
-        this.levelDigits = uiNode('LevelDigits', 80, 40);
-        this.levelDigits.setParent(this.node);
+        this.levelCaption.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this.levelCaption.verticalAlign = Label.VerticalAlign.CENTER;
+        this.levelCaption.enableWrapText = false;
+        this.levelCaption.cacheMode = Label.CacheMode.BITMAP;
+        this.levelCaption.node.getComponent(UITransform)?.setAnchorPoint(0.5, 0.5);
     }
 
     private layout(): void {
@@ -96,11 +108,6 @@ export class LeaderboardItem extends Component {
         this.nameLabel?.node.getComponent(UITransform)?.setContentSize(nameW, height * 0.46);
         this.nameLabel?.node.setPosition(nameX, 0, 0);
         if (this.nameLabel) this.nameLabel.fontSize = Math.max(18, Math.round(height * 0.22));
-
-        this.levelCaption?.node.getComponent(UITransform)?.setContentSize(height * 1.1, height * 0.24);
-        this.levelCaption?.node.setPosition(width / 2 - height * 0.28, height * 0.16, 0);
-        if (this.levelCaption) this.levelCaption.fontSize = Math.max(14, Math.round(height * 0.15));
-        this.levelDigits?.setPosition(width / 2 - height * 0.72, -height * 0.16, 0);
     }
 
     private paint(): void {
@@ -113,7 +120,6 @@ export class LeaderboardItem extends Component {
         fillDigits(this.rankDigits, entry.rank, this.itemHeight * 0.28);
         showFrame(this.avatar, avatarFrame(entry.avatarId) ?? profileAvatar(entry.avatarId).portrait);
         if (this.nameLabel) this.nameLabel.string = entry.playerName;
-        if (this.levelCaption) this.levelCaption.string = 'Level';
-        fillDigits(this.levelDigits, entry.level, this.itemHeight * 0.28);
+        if (this.levelCaption) layoutLevelColumn(this.levelCaption, this.levelDigits, this.itemWidth, this.itemHeight, entry.level);
     }
 }

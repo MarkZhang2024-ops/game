@@ -33,7 +33,7 @@ const PANEL_W = 977;
 const PANEL_H = 1637;
 const PLATE_W = 484;
 const PLATE_H = 138;
-const NAME_INSET = 10;
+const NAME_INSET = 36;
 const NAME_COLOR = new Color(92, 42, 24, 255);
 const NAME_LIMIT = 12;
 
@@ -139,15 +139,18 @@ export class ProfilePopup extends Component {
         plateSprite.sizeMode = Sprite.SizeMode.CUSTOM;
         plateSprite.type = Sprite.Type.SIMPLE;
         applySprite(plateSprite, NAME_PLATE);
-        const text = addLabel(plate, 'Text', '', 44, NAME_COLOR, PLATE_W - NAME_INSET * 2, PLATE_H);
+        const fieldW = PLATE_W - NAME_INSET * 2;
+        const field = uiNode('NameField', fieldW, PLATE_H);
+        field.setParent(plate);
+        const text = addLabel(field, 'Text', '', 44, NAME_COLOR, fieldW, PLATE_H);
         text.horizontalAlign = Label.HorizontalAlign.LEFT;
         text.verticalAlign = Label.VerticalAlign.CENTER;
-        const placeholder = addLabel(plate, 'Placeholder', 'Name', 44, new Color(160, 112, 80, 180), PLATE_W - NAME_INSET * 2, PLATE_H);
+        const placeholder = addLabel(field, 'Placeholder', 'Name', 44, new Color(160, 112, 80, 180), fieldW, PLATE_H);
         placeholder.horizontalAlign = Label.HorizontalAlign.LEFT;
         placeholder.verticalAlign = Label.VerticalAlign.CENTER;
         this.placeNameLabel(text);
         this.placeNameLabel(placeholder);
-        this.nameEdit = plate.addComponent(EditBox);
+        this.nameEdit = field.addComponent(EditBox);
         this.nameEdit.textLabel = text;
         this.nameEdit.placeholderLabel = placeholder;
         this.nameEdit.inputMode = EditBox.InputMode.SINGLE_LINE;
@@ -234,14 +237,17 @@ export class ProfilePopup extends Component {
         }
     }
 
-    /** EditBox parks the label on the box corner. Keep the name inside, 10px from the left edge. */
+    /** EditBox pins the label to the field's top-left. The field itself is already inset from the plate. */
     private placeNameLabel(label: Label | null): void {
         if (!label) return;
         const node = label.node;
+        const parent = node.parent?.getComponent(UITransform);
+        const width = parent?.width || PLATE_W - NAME_INSET * 2;
+        const height = parent?.height || PLATE_H;
         const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
-        transform.setAnchorPoint(0, 0.5);
-        transform.setContentSize(PLATE_W - NAME_INSET * 2, PLATE_H);
-        node.setPosition(-PLATE_W / 2 + NAME_INSET, 0, 0);
+        transform.setAnchorPoint(0, 1);
+        transform.setContentSize(width, height);
+        node.setPosition(-width / 2, height / 2, 0);
         label.horizontalAlign = Label.HorizontalAlign.LEFT;
         label.verticalAlign = Label.VerticalAlign.CENTER;
     }

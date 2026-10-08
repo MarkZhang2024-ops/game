@@ -2,7 +2,7 @@
  * Leaderboard SpriteFrame ids and the rank/level digit strip.
  */
 
-import { Node, Sprite, UITransform } from 'cc';
+import { Label, Node, Sprite, UITransform } from 'cc';
 import { loadSpriteFrame } from './GameArt';
 import { uiNode } from './UiKit';
 
@@ -66,6 +66,39 @@ export function showFrame(sprite: Sprite, uuid: string | null): void {
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         sprite.type = Sprite.Type.SIMPLE;
     });
+}
+
+/**
+ * Right-hand Level column. The word is larger than the digits, and the digits sit on its center line.
+ * `height` is the row height so the list and the bottom card share one size.
+ */
+export function layoutLevelColumn(
+    caption: Label,
+    digits: Node,
+    width: number,
+    height: number,
+    level: number,
+    levelRatio = 0.22,
+    digitOfLevel = 0.78,
+    rightInset = 0,
+): void {
+    const levelSize = Math.max(16, Math.round(height * levelRatio));
+    const digitH = Math.max(12, Math.round(levelSize * digitOfLevel));
+    const gap = Math.max(2, Math.round(height * 0.045));
+    const columnX = width / 2 - (rightInset > 0 ? rightInset : Math.round(height * 0.9));
+    const node = caption.node;
+    const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+    transform.setAnchorPoint(0.5, 0.5);
+    transform.setContentSize(Math.round(levelSize * 4.2), Math.round(levelSize * 1.15));
+    caption.horizontalAlign = Label.HorizontalAlign.CENTER;
+    caption.verticalAlign = Label.VerticalAlign.CENTER;
+    caption.overflow = Label.Overflow.SHRINK;
+    caption.fontSize = levelSize;
+    caption.lineHeight = levelSize;
+    caption.string = 'Level';
+    node.setPosition(columnX, (gap + digitH) / 2, 0);
+    digits.setPosition(columnX, -(gap + levelSize) / 2, 0);
+    fillDigits(digits, level, digitH);
 }
 
 /** Centers digit sprites in host. Returns the strip width. */

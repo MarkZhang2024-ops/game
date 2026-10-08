@@ -27,6 +27,7 @@ import { BottomNavigation } from './BottomNavigation';
 import { LeaderboardItem } from './LeaderboardItem';
 import {
     fillDigits,
+    layoutLevelColumn,
     LB_BACKGROUND,
     LB_DECORATION,
     LB_TITLE,
@@ -49,7 +50,7 @@ const DECOR_TOP = 292;
 const NAV_H = 210;
 const ITEM_W = 1045;
 const ITEM_H = 154;
-const ITEM_GAP = 12;
+const ITEM_GAP = -10;
 const PAD_TOP = 8;
 const PAD_BOTTOM = 20;
 const RANK_CARD_W = 1040;
@@ -263,8 +264,9 @@ export class LeaderboardPage extends Component {
         this.currentName.node.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
 
         this.currentLevelCaption = addLabel(this.currentCard, 'LevelCaption', 'Level', 22, NAME_COLOR, 160, 36);
-        this.currentLevelCaption.horizontalAlign = Label.HorizontalAlign.RIGHT;
-        this.currentLevelCaption.node.getComponent(UITransform)?.setAnchorPoint(1, 0.5);
+        this.currentLevelCaption.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this.currentLevelCaption.verticalAlign = Label.VerticalAlign.CENTER;
+        this.currentLevelCaption.node.getComponent(UITransform)?.setAnchorPoint(0.5, 0.5);
 
         this.currentLevelDigits = uiNode('LevelDigits', 120, 48);
         this.currentLevelDigits.setParent(this.currentCard);
@@ -283,7 +285,15 @@ export class LeaderboardPage extends Component {
             });
         }
         this.layoutContent(resetScroll);
+        this.scheduleOnce(this.repaintRows, 0);
     }
+
+    /** System labels inside the scroll mask only keep the first row until the next frame. */
+    private repaintRows = (): void => {
+        this.content?.children.forEach((child) => {
+            child.getComponent(LeaderboardItem)?.repaint();
+        });
+    };
 
     /** Server tierId wins. Otherwise row order is Tier 1..5. Ranges stay in LEVEL_TIERS. */
     private withTier(entry: LeaderboardEntry, index: number): LeaderboardEntry {
@@ -312,7 +322,9 @@ export class LeaderboardPage extends Component {
         this.currentStar.enabled = !!star;
         showFrame(this.currentStar, star);
         const height = this.currentCard.getComponent(UITransform)?.height ?? RANK_CARD_H;
-        fillDigits(this.currentRankDigits, entry.rank, height * 0.16);
+        const starSize = height * 0.46;
+        fillDigits(this.currentRankDigits, entry.rank, starSize * 0.36);
+        this.currentRankDigits.setPosition(0, -starSize * 0.06, 0);
         this.layoutCurrent();
     }
 
@@ -325,8 +337,6 @@ export class LeaderboardPage extends Component {
         showFrame(this.currentAvatar, avatarFrame(profile.avatarId) ?? profileAvatar(profile.avatarId).portrait);
         if (this.currentLevelCaption) this.currentLevelCaption.node.active = true;
         this.currentLevelDigits.active = true;
-        const height = this.currentCard.getComponent(UITransform)?.height ?? RANK_CARD_H;
-        fillDigits(this.currentLevelDigits, LevelManager.getCurrentLevel(), height * 0.16);
         this.layoutCurrent();
     }
 
@@ -391,6 +401,7 @@ export class LeaderboardPage extends Component {
         const star = height * 0.46;
         this.currentStar?.node.getComponent(UITransform)?.setContentSize(star, star);
         this.currentStar?.node.setPosition(left + height * 0.48, height * 0.06, 0);
+        this.currentRankDigits?.setPosition(0, -star * 0.06, 0);
         const avatar = height * 0.46;
         this.currentAvatar?.node.getComponent(UITransform)?.setContentSize(avatar, avatar);
         this.currentAvatar?.node.setPosition(left + height * 1.12, height * 0.08, 0);
@@ -398,12 +409,23 @@ export class LeaderboardPage extends Component {
         ribbon?.getComponent(UITransform)?.setContentSize(height * 0.7, height * 0.22);
         ribbon?.setPosition(left + height * 1.12, -height * 0.22, 0);
         this.currentName?.node.getComponent(UITransform)?.setContentSize(width * 0.36, height * 0.28);
-        this.currentName?.node.setPosition(left + height * 1.55, height * 0.1, 0);
-        if (this.currentName) this.currentName.fontSize = Math.max(18, Math.round(height * 0.13));
-        this.currentLevelCaption?.node.getComponent(UITransform)?.setContentSize(height * 0.7, height * 0.16);
-        this.currentLevelCaption?.node.setPosition(width / 2 - height * 0.22, height * 0.12, 0);
-        if (this.currentLevelCaption) this.currentLevelCaption.fontSize = Math.max(14, Math.round(height * 0.09));
-        this.currentLevelDigits?.setPosition(width / 2 - height * 0.55, -height * 0.08, 0);
+        this.currentName?.node.setPosition(left + height * 1.55, 0, 0);
+        if (this.currentName) {
+            this.currentName.fontSize = Math.max(18, Math.round(height * 0.13));
+            this.currentName.verticalAlign = Label.VerticalAlign.CENTER;
+        }
+        if (this.currentLevelCaption && this.currentLevelDigits) {
+            layoutLevelColumn(
+                this.currentLevelCaption,
+                this.currentLevelDigits,
+                width,
+                height,
+                LevelManager.getCurrentLevel(),
+                0.15,
+                0.95,
+                Math.round(width * 0.134),
+            );
+        }
     }
 
     private layoutBackground(pageW: number, pageH: number): void {

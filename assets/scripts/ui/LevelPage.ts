@@ -171,9 +171,13 @@ export class LevelPage extends Component {
         plateSprite.sizeMode = Sprite.SizeMode.CUSTOM;
         plateSprite.type = Sprite.Type.SIMPLE;
         applySprite(plateSprite, NAME_PLATE);
-        this.playerNameLabel = addLabel(plate, 'PlayerName', '', 34, NAME_COLOR, 250, 64);
+        this.playerNameLabel = addLabel(plate, 'PlayerName', '', 34, NAME_COLOR, 230, 64);
         this.playerNameLabel.enableOutline = false;
-        this.playerNameLabel.node.setPosition(52, 0, 0);
+        this.playerNameLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this.playerNameLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this.playerNameLabel.lineHeight = 34;
+        // Cream center is above the plate node center; the bear covers the left of the pill.
+        this.playerNameLabel.node.setPosition(47, 8, 0);
 
         const avatar = uiNode('CharacterIcon', 224, 219);
         avatar.setParent(top);
