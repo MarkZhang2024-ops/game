@@ -14,9 +14,7 @@ import {
     Prefab,
     ScrollView,
     Sprite,
-    sys,
     UITransform,
-    view,
     Widget,
 } from 'cc';
 import { GameDataManager } from '../core/GameDataManager';
@@ -63,14 +61,6 @@ const NAV_HOME = '417c9a44-a35c-43de-844b-4686c56e5747@f9941';
 const NAV_CALENDAR = 'e8b5d506-858f-4e60-a873-f1a1dfc945c1@f9941';
 
 const NAME_COLOR = new Color(112, 54, 28, 255);
-
-function safeBottom(pageH: number): number {
-    const safe = sys.getSafeAreaRect();
-    const visible = view.getVisibleSize();
-    if (safe.width <= 0 || safe.height <= 0 || visible.width <= 0 || visible.height <= 0) return 0;
-    if (safe.width > visible.width + 2 || safe.height > visible.height + 2) return 0;
-    return Math.max(0, safe.y) * (pageH / visible.height);
-}
 
 @ccclass('LeaderboardPage')
 export class LeaderboardPage extends Component {
@@ -358,7 +348,7 @@ export class LeaderboardPage extends Component {
         const pageH = size?.height || DESIGN_H;
         if (pageW < 10 || pageH < 10) return;
         const scale = pageW / DESIGN_W;
-        const bottom = safeBottom(pageH);
+        const bottom = 0;
         const navH = NAV_H * scale;
         const rankW = RANK_CARD_W * scale;
         const rankH = RANK_CARD_H * scale;

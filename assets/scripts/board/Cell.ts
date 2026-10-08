@@ -21,6 +21,8 @@ import {
 import { CellColor, CELL_COLOR_HEX } from '../puzzle/PuzzleTypes';
 import { COLORS, LAYOUT, DEBUG_CLICK, CellMarkState, SuspectType } from '../utils/Constants';
 import { applySpriteFrame, MARK_X_FRAME, SUSPECT_FRAME, tileFrameFor } from '../ui/GameArt';
+import { CellPressEffect } from './CellPressEffect';
+import { JellySuspect } from './JellySuspect';
 
 const { ccclass } = _decorator;
 
@@ -52,6 +54,8 @@ export class Cell extends Component {
     private suspectMarkGraphics: Graphics | null = null;
     private restPosition = new Vec3();
     private hintMarkNode: Node | null = null;
+    private pressEffect: CellPressEffect | null = null;
+    private jelly: JellySuspect | null = null;
 
     public init(row: number, col: number): void {
         this.row = row;
@@ -70,11 +74,15 @@ export class Cell extends Component {
     }
 
     protected onEnable(): void {
+        this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
         this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+        this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     }
 
     protected onDisable(): void {
+        this.node.off(Node.EventType.TOUCH_START, this.onTouchStart, this);
         this.node.off(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+        this.node.off(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     }
 
     public setup(
@@ -191,6 +199,20 @@ export class Cell extends Component {
         }
     }
 
+    private ensurePressEffect(): CellPressEffect {
+        if (this.pressEffect && this.pressEffect.isValid) return this.pressEffect;
+        this.pressEffect = this.getComponent(CellPressEffect) || this.addComponent(CellPressEffect);
+        return this.pressEffect;
+    }
+
+    private onTouchStart(): void {
+        this.ensurePressEffect().pressDown(this.row, this.col);
+    }
+
+    private onTouchCancel(): void {
+        this.ensurePressEffect().cancelPress(this.row, this.col);
+    }
+
     public showSuspect(animate: boolean): void {
         this.setMarkState(CellMarkState.SUSPECT, SuspectType.PLAYER, animate);
     }
@@ -200,6 +222,15 @@ export class Cell extends Component {
     }
 
     public playShake(): void {
+        const effect = this.ensurePressEffect();
+        if (effect.isBusy()) {
+            effect.afterRelease(() => this.playShakeNow());
+            return;
+        }
+        this.playShakeNow();
+    }
+
+    private playShakeNow(): void {
         const p = this.node.position.clone();
         this.restPosition.set(p);
         Tween.stopAllByTarget(this.node);
@@ -284,6 +315,7 @@ export class Cell extends Component {
                 `row=${this.row} col=${this.col} cellSize=${this.cellSize}`
             );
         }
+        this.ensurePressEffect().pressUp(this.row, this.col);
         this.clickHandler?.(this.row, this.col);
     }
 
@@ -357,11 +389,17 @@ export class Cell extends Component {
     private playPlaceAnim(): void {
         const target = this.suspectNode ?? this.suspectAnchor ?? this.suspectMarkNode;
         if (!target) return;
-        target.setScale(new Vec3(0, 0, 1));
-        tween(target)
-            .to(0.14, { scale: new Vec3(1.12, 1.12, 1) })
-            .to(0.08, { scale: new Vec3(1, 1, 1) })
-            .start();
+        target.setScale(0, 0, 1);
+        const play = () => this.ensureJelly(target).showEffect(target);
+        const effect = this.ensurePressEffect();
+        if (effect.isBusy()) effect.afterRelease(play);
+        else play();
+    }
+
+    private ensureJelly(target: Node): JellySuspect {
+        if (this.jelly && this.jelly.isValid && this.jelly.node === target) return this.jelly;
+        this.jelly = target.getComponent(JellySuspect) || target.addComponent(JellySuspect);
+        return this.jelly;
     }
 
     private markDirty(): void {

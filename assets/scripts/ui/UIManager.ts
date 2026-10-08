@@ -75,6 +75,7 @@ export class UIManager extends Component {
         } else {
             this.achievement = this.achievementPage.getComponent(AchievementPage);
         }
+        this.fitPage(this.achievementPage);
         this.achievement?.ensureView();
 
         if (!this.levelPage) {
@@ -83,6 +84,7 @@ export class UIManager extends Component {
         } else {
             this.level = this.levelPage.getComponent(LevelPage);
         }
+        this.fitPage(this.levelPage);
         this.level?.ensureView();
         this.level?.setSettingsHandler(() => this.showSettingsPopup());
 
@@ -92,6 +94,7 @@ export class UIManager extends Component {
         } else {
             this.leaderboard = this.leaderboardPage.getComponent(LeaderboardPage);
         }
+        this.fitPage(this.leaderboardPage);
         this.leaderboard?.ensureView();
         this.leaderboard?.setItemPrefab(this.leaderboardItemPrefab);
     }
@@ -113,10 +116,17 @@ export class UIManager extends Component {
     }
 
     private createPage(name: string): Node {
-        const node = uiNode(name, 1080, 2280);
+        const node = uiNode(name, 1080, 2400);
         node.active = false;
         node.setParent(this.node);
+        this.fitPage(node);
         return node;
+    }
+
+    /** Pages fill GameUI so the bottom bar sits on the screen edge. */
+    private fitPage(page: Node | null): void {
+        if (!page) return;
+        stretch(page);
     }
 
     private mountNavigation(): void {

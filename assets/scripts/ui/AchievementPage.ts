@@ -13,10 +13,8 @@ import {
     Prefab,
     ScrollView,
     Sprite,
-    sys,
     UITransform,
     Vec2,
-    view,
     Widget,
 } from 'cc';
 import { LevelManager } from '../core/LevelManager';
@@ -49,14 +47,6 @@ const NAV_BAR = 'cab2fd53-8d8d-41d0-b006-e33c5ad2b132@f9941';
 const NAV_CROWN = 'ae18f3b1-65cb-4c4d-aa71-7ae2fcf1f938@f9941';
 const NAV_HOME = '417c9a44-a35c-43de-844b-4686c56e5747@f9941';
 const NAV_CALENDAR = 'e8b5d506-858f-4e60-a873-f1a1dfc945c1@f9941';
-
-function safeBottom(pageH: number): number {
-    const safe = sys.getSafeAreaRect();
-    const visible = view.getVisibleSize();
-    if (safe.width <= 0 || safe.height <= 0 || visible.width <= 0 || visible.height <= 0) return 0;
-    if (safe.width > visible.width + 2 || safe.height > visible.height + 2) return 0;
-    return Math.max(0, safe.y) * (pageH / visible.height);
-}
 
 @ccclass('AchievementPage')
 export class AchievementPage extends Component {
@@ -237,7 +227,7 @@ export class AchievementPage extends Component {
         const scale = pageW / DESIGN_W;
         const headerH = HEADER_H * scale;
         const navH = NAV_H * scale;
-        const bottom = safeBottom(pageH);
+        const bottom = 0;
         this.cardWidth = CARD_W * scale;
         this.cardHeight = CARD_H * scale;
         this.cardSpacing = CARD_SPACING * scale;

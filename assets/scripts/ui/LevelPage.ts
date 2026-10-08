@@ -13,10 +13,8 @@ import {
     Label,
     Node,
     Sprite,
-    sys,
     UITransform,
     Vec2,
-    view,
     Widget,
 } from 'cc';
 import { GameDataManager } from '../core/GameDataManager';
@@ -61,14 +59,6 @@ interface DesignRect {
 }
 
 const CARD_RECT: DesignRect = { x: 76, y: 489, w: 915, h: 1121 };
-
-function safeBottom(pageH: number): number {
-    const safe = sys.getSafeAreaRect();
-    const visible = view.getVisibleSize();
-    if (safe.width <= 0 || safe.height <= 0 || visible.width <= 0 || visible.height <= 0) return 0;
-    if (safe.width > visible.width + 2 || safe.height > visible.height + 2) return 0;
-    return Math.max(0, safe.y) * (pageH / visible.height);
-}
 
 @ccclass('LevelPage')
 export class LevelPage extends Component {
@@ -301,7 +291,7 @@ export class LevelPage extends Component {
         this.placeIn(card?.getChildByName('SceneUnderline') ?? null, { x: 399, y: 884, w: 415, h: 3 }, CARD_RECT);
 
         const barHeight = 211 * (pageW / DESIGN_W);
-        const barTop = pageH - safeBottom(pageH) - barHeight;
+        const barTop = pageH - barHeight;
         let buttonY = 1749;
         if (buttonY + 262 > barTop - 24) buttonY = barTop - 24 - 262;
         this.place(this.levelButton?.node ?? null, { x: 223, y: buttonY, w: 630, h: 262 }, pageW, pageH);
@@ -343,7 +333,7 @@ export class LevelPage extends Component {
 
     private layoutNav(pageW: number, pageH: number, barHeight: number): void {
         if (!this.navSlot) return;
-        const bottom = safeBottom(pageH);
+        const bottom = 0;
         this.navSlot.getComponent(UITransform)?.setContentSize(pageW, barHeight);
         this.navSlot.setPosition(0, -pageH / 2 + bottom + barHeight / 2, 0);
         this.navigation?.node.getComponent(Widget)?.updateAlignment();

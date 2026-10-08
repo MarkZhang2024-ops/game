@@ -114,6 +114,9 @@ export const GAME = {
 /** Set false after click-mapping is verified. */
 export const DEBUG_CLICK = true;
 
+/** Logs cell press down / press up. */
+export const DEBUG_PRESS = true;
+
 export const EMOJI = {
     suspect: '\u{1F575}',
     mark: '\u2716',

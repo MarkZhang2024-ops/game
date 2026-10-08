@@ -75,7 +75,7 @@
     "_priority": 1073741824,
     "_fov": 45,
     "_fovAxis": 0,
-    "_orthoHeight": 1140,
+    "_orthoHeight": 1200,
     "_near": 1,
     "_far": 2000,
     "_color": { "__type__": "cc.Color", "r": 255, "g": 156, "b": 200, "a": 255 },
@@ -121,7 +121,7 @@
     "node": { "__id__": 5 },
     "_enabled": true,
     "__prefab": null,
-    "_contentSize": { "__type__": "cc.Size", "width": 1080, "height": 2280 },
+    "_contentSize": { "__type__": "cc.Size", "width": 1080, "height": 2400 },
     "_anchorPoint": { "__type__": "cc.Vec2", "x": 0.5, "y": 0.5 },
     "_id": "lobby_game_ui_ut"
   },
@@ -159,7 +159,7 @@
     "node": { "__id__": 2 },
     "_enabled": true,
     "__prefab": null,
-    "_contentSize": { "__type__": "cc.Size", "width": 1080, "height": 2280 },
+    "_contentSize": { "__type__": "cc.Size", "width": 1080, "height": 2400 },
     "_anchorPoint": { "__type__": "cc.Vec2", "x": 0.5, "y": 0.5 },
     "_id": "lobby_canvas_ut"
   },
@@ -198,7 +198,7 @@
     "_isAbsHorizontalCenter": true,
     "_isAbsVerticalCenter": true,
     "_originalWidth": 1080,
-    "_originalHeight": 2280,
+    "_originalHeight": 2400,
     "_alignMode": 2,
     "_lockFlags": 0,
     "_id": "lobby_canvas_wd"
