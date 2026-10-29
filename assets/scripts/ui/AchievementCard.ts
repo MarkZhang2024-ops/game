@@ -1,21 +1,15 @@
 /**
- * One achievement card. Built once and filled from AchievementData.
- * The cut art already includes the candy frame, photo, and banner title.
+ * One achievement card. Scene art already has the candy frame and title.
+ * Unlocked cards overlay the green progress bar and digit sprites from the UI cut.
  */
 
 import {
     _decorator,
     Color,
     Component,
-    ImageAsset,
     Label,
     Node,
-    ProgressBar,
-    Rect,
-    Size,
     Sprite,
-    SpriteFrame,
-    Texture2D,
     UITransform,
 } from 'cc';
 import { AchievementData } from '../data/AchievementData';
@@ -24,61 +18,26 @@ import { addLabel, applySprite, outline, Palette, uiNode } from './UiKit';
 
 const { ccclass } = _decorator;
 
-const LOCK_FRAME = 'f7d9f0c6-372c-4774-b3a9-f5e767c58464@f9941';
-const FILL = new Color(82, 212, 42, 255);
-const TRACK = new Color(36, 122, 18, 255);
-
-let capsule: SpriteFrame | null = null;
-
-function capsuleFrame(): SpriteFrame {
-    if (capsule && capsule.isValid) return capsule;
-    const width = 64;
-    const height = 36;
-    const radius = 16;
-    const pixels = new Uint8Array(width * height * 4);
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const dx = x < radius ? radius - x - 0.5 : x >= width - radius ? x - (width - radius) + 0.5 : 0;
-            const dy = y - height / 2 + 0.5;
-            const dist = Math.hypot(dx, dy);
-            const edge = dx === 0 ? radius - Math.abs(dy) : radius - dist;
-            const alpha = edge >= 1 ? 255 : edge <= 0 ? 0 : Math.round(edge * 255);
-            const index = (y * width + x) * 4;
-            pixels[index] = 255;
-            pixels[index + 1] = 255;
-            pixels[index + 2] = 255;
-            pixels[index + 3] = alpha;
-        }
-    }
-    const image = new ImageAsset();
-    image.reset({
-        _data: pixels,
-        width,
-        height,
-        format: Texture2D.PixelFormat.RGBA8888,
-        _compressed: false,
-    });
-    const texture = new Texture2D();
-    texture.image = image;
-    const frame = new SpriteFrame();
-    frame.texture = texture;
-    frame.packable = false;
-    frame.rect = new Rect(0, 0, width, height);
-    frame.originalSize = new Size(width, height);
-    frame.insetLeft = radius;
-    frame.insetRight = radius;
-    frame.insetTop = radius;
-    frame.insetBottom = radius;
-    capsule = frame;
-    return frame;
-}
-
-function sliced(sprite: Sprite, color: Color): void {
-    sprite.spriteFrame = capsuleFrame();
-    sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-    sprite.type = Sprite.Type.SLICED;
-    sprite.color = color;
-}
+const BAR_TRACK = '94d26181-82c3-46a0-a6f9-0b93d084eff8@f9941';
+const BAR_FILL = 'b3362787-0dd8-48d4-a59f-fbca5f45f883@f9941';
+const SLASH = '8a5b4098-0ac5-45f9-8b98-dc9314ff13e7@f9941';
+const DIGITS = [
+    '5746ac14-0a3d-4354-a935-d01d56775fb6@f9941',
+    'fdf4162f-262a-4e35-a017-580804e55a2a@f9941',
+    'f223c56f-5098-4d3d-bf7e-8916b0c7cc4f@f9941',
+    '4574237d-63d6-424d-9238-70ee94d76aba@f9941',
+    '51be6e03-338c-47d3-b7fa-0321ecaa0b7e@f9941',
+    '927e46bd-9826-44de-95bd-484fbe6f4b31@f9941',
+    'f82a09e7-3316-42ab-a09b-8ae1528b278d@f9941',
+    '8b22c776-8bdc-4ee4-bf89-b0310a5dd3a7@f9941',
+    '787c2ec5-9163-47e5-8769-0c7da4fe14f8@f9941',
+    'f854d00e-af1f-497d-a5d6-e52baa12c373@f9941',
+];
+const DIGIT_SIZE = [
+    [28, 40], [26, 38], [28, 39], [27, 40], [30, 38],
+    [27, 39], [28, 40], [28, 38], [28, 40], [29, 40],
+];
+const SLASH_SIZE = [15, 39];
 
 @ccclass('AchievementCard')
 export class AchievementCard extends Component {
@@ -89,31 +48,28 @@ export class AchievementCard extends Component {
     private cardHeight = 839;
     private cardImage: Sprite | null = null;
     private titleLabel: Label | null = null;
-    private lockOverlay: Node | null = null;
     private progressRoot: Node | null = null;
-    private progressBar: ProgressBar | null = null;
-    private completedText: Label | null = null;
+    private fillSprite: Sprite | null = null;
+    private countRoot: Node | null = null;
 
     public setData(data: AchievementData): void {
         this.data = data;
         this.ensure();
         this.apply();
-        this.setTierProgress(data.progress, `${data.completed} / ${data.total}`);
     }
 
     /** Fill length and the count use the same LevelManager result. */
-    public setTierProgress(progress: number, completedText: string): void {
+    public setTierProgress(progress: number, _completedText?: string): void {
         this.ensure();
         const value = Math.max(0, Math.min(1, progress));
-        const fill = this.progressBar?.barSprite?.node ?? null;
-        if (fill) fill.active = value > 0;
-        if (this.progressBar) {
-            if (this.progressBar.progress === value) {
-                this.progressBar.progress = value === 0 ? 1 : 0;
-            }
-            this.progressBar.progress = value;
+        if (this.fillSprite) {
+            this.fillSprite.type = Sprite.Type.FILLED;
+            this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
+            this.fillSprite.fillStart = 0;
+            this.fillSprite.fillRange = value;
+            this.fillSprite.node.active = value > 0;
         }
-        if (this.completedText) this.completedText.string = completedText;
+        if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
 
     public setCardSize(width: number, height: number): void {
@@ -121,7 +77,7 @@ export class AchievementCard extends Component {
         this.cardHeight = height;
         this.ensure();
         this.layout();
-        if (this.data) this.setTierProgress(this.data.progress, `${this.data.completed} / ${this.data.total}`);
+        if (this.data) this.setTierProgress(this.data.progress);
     }
 
     private ensure(): void {
@@ -141,36 +97,34 @@ export class AchievementCard extends Component {
         outline(this.titleLabel, new Color(90, 20, 30, 255), 4);
         this.titleLabel.node.active = false;
 
-        this.lockOverlay = uiNode('LockOverlay', 294, 362);
-        this.lockOverlay.setParent(this.node);
-        const icon = uiNode('LockIcon', 294, 362);
-        icon.setParent(this.lockOverlay);
-        const lock = icon.addComponent(Sprite);
-        lock.sizeMode = Sprite.SizeMode.CUSTOM;
-        lock.type = Sprite.Type.SIMPLE;
-        applySprite(lock, LOCK_FRAME);
-
-        this.progressRoot = uiNode('ProgressBar', 372, 46);
+        this.progressRoot = uiNode('ProgressBar', 372, 70);
         this.progressRoot.setParent(this.node);
-        const track = uiNode('Background', 372, 46);
+        const track = uiNode('Track', 372, 70);
         track.setParent(this.progressRoot);
-        sliced(track.addComponent(Sprite), TRACK);
+        const trackSprite = track.addComponent(Sprite);
+        trackSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        applySprite(trackSprite, BAR_TRACK);
 
-        const fill = uiNode('Fill', 372, 36);
+        const fill = uiNode('Fill', 328, 54);
         fill.setParent(this.progressRoot);
-        const fillTransform = fill.getComponent(UITransform)!;
-        fillTransform.setAnchorPoint(0, 0.5);
-        const fillSprite = fill.addComponent(Sprite);
-        sliced(fillSprite, FILL);
-        fillSprite.type = Sprite.Type.SIMPLE;
-        this.progressBar = this.progressRoot.addComponent(ProgressBar);
-        this.progressBar.mode = ProgressBar.Mode.HORIZONTAL;
-        this.progressBar.barSprite = fillSprite;
-        this.progressBar.progress = 0;
-        fill.active = false;
+        this.fillSprite = fill.addComponent(Sprite);
+        this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        this.fillSprite.type = Sprite.Type.FILLED;
+        this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
+        this.fillSprite.fillStart = 0;
+        this.fillSprite.fillRange = 0;
+        loadSpriteFrame(BAR_FILL, (frame) => {
+            if (!this.fillSprite?.isValid || !frame) return;
+            this.fillSprite.spriteFrame = frame;
+            this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+            this.fillSprite.type = Sprite.Type.FILLED;
+            this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
+            this.fillSprite.fillStart = 0;
+            this.fillSprite.fillRange = this.data ? Math.max(0, Math.min(1, this.data.progress)) : 0;
+        });
 
-        this.completedText = addLabel(this.progressRoot, 'CompletedText', '', 22, Color.WHITE, 372, 46);
-        outline(this.completedText, new Color(20, 70, 16, 255), 2);
+        this.countRoot = uiNode('Count', 200, 40);
+        this.countRoot.setParent(this.progressRoot);
         this.layout();
     }
 
@@ -186,54 +140,69 @@ export class AchievementCard extends Component {
         title?.getComponent(UITransform)?.setContentSize(width * 0.7, 88 * (height / 839));
         title?.setPosition(0, height / 2 - 78 * (height / 839), 0);
 
-        const lockW = 294 * (width / 884);
-        const lockH = 362 * (height / 839);
-        if (this.lockOverlay) {
-            this.lockOverlay.getComponent(UITransform)?.setContentSize(lockW, lockH);
-            this.lockOverlay.setPosition(0, 14 * (height / 839), 0);
-            const icon = this.lockOverlay.getChildByName('LockIcon');
-            icon?.getComponent(UITransform)?.setContentSize(lockW, lockH);
-            icon?.setPosition(0, 0, 0);
-        }
-
         const barW = 372 * (width / 884);
-        const barH = 46 * (height / 839);
-        if (!this.progressRoot || !this.progressBar) return;
+        const barH = 70 * (height / 839);
+        if (!this.progressRoot) return;
         this.progressRoot.getComponent(UITransform)?.setContentSize(barW, barH);
         this.progressRoot.setPosition(0, -height * 0.325, 0);
-        const track = this.progressRoot.getChildByName('Background');
+        const track = this.progressRoot.getChildByName('Track');
         track?.getComponent(UITransform)?.setContentSize(barW, barH);
         track?.setPosition(0, 0, 0);
-        const fill = this.progressBar.barSprite?.node;
-        const innerW = Math.max(16, barW - 8);
-        const innerH = Math.max(12, barH - 10);
-        if (fill) {
-            const fillTransform = fill.getComponent(UITransform)!;
-            fillTransform.setAnchorPoint(0, 0.5);
-            fillTransform.setContentSize(innerW, innerH);
-            fill.setPosition(-innerW / 2, 0, 0);
-            const fillSprite = fill.getComponent(Sprite);
-            if (fillSprite) fillSprite.type = Sprite.Type.SIMPLE;
-        }
-        this.progressBar.totalLength = innerW;
-        const count = this.completedText?.node;
-        count?.getComponent(UITransform)?.setContentSize(barW, barH);
-        count?.setPosition(0, 0, 0);
-        if (this.completedText) {
-            const font = Math.max(16, Math.round(barH * 0.55));
-            this.completedText.fontSize = font;
-            this.completedText.lineHeight = font + 2;
-        }
+        const fill = this.fillSprite?.node;
+        const innerW = barW * (374 / 425);
+        const innerH = barH * (70 / 120);
+        fill?.getComponent(UITransform)?.setContentSize(innerW, innerH);
+        fill?.setPosition(0, 0, 0);
+        this.countRoot?.setPosition(0, 0, 0);
+        if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
 
     private apply(): void {
         if (!this.data) return;
         this.layout();
         if (this.titleLabel) this.titleLabel.string = this.data.title;
-        if (this.lockOverlay) this.lockOverlay.active = !this.data.unlocked;
         if (this.progressRoot) this.progressRoot.active = this.data.unlocked;
-        this.setTierProgress(this.data.progress, `${this.data.completed} / ${this.data.total}`);
+        this.setTierProgress(this.data.progress);
         this.loadImage(this.data.image);
+    }
+
+    private paintCount(completed: number, total: number): void {
+        if (!this.countRoot) return;
+        const host = this.countRoot;
+        host.removeAllChildren();
+        const digitH = Math.max(16, Math.round(this.cardHeight / 839 * 32));
+        const pieces = `${Math.max(0, Math.floor(completed))}/${Math.max(0, Math.floor(total))}`;
+        const gap = Math.max(1, Math.round(digitH * 0.08));
+        const slashGap = Math.max(4, Math.round(digitH * 0.18));
+        const nodes: { node: Node; width: number; after: number }[] = [];
+        let totalW = 0;
+        for (let i = 0; i < pieces.length; i++) {
+            const ch = pieces[i];
+            const slash = ch === '/';
+            const index = ch.charCodeAt(0) - 48;
+            if (!slash && (index < 0 || index > 9)) continue;
+            const [sourceW, sourceH] = slash ? SLASH_SIZE : DIGIT_SIZE[index];
+            const width = digitH * (sourceW / sourceH);
+            const node = uiNode(slash ? 'Slash' : `Digit${ch}`, width, digitH);
+            node.setParent(host);
+            const sprite = node.addComponent(Sprite);
+            sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+            applySprite(sprite, slash ? SLASH : DIGITS[index]);
+            const after = slash || pieces[i + 1] === '/' ? slashGap : gap;
+            nodes.push({ node, width, after });
+            totalW += width;
+        }
+        if (nodes.length > 1) {
+            for (let i = 0; i < nodes.length - 1; i++) totalW += nodes[i].after;
+        }
+        const transform = host.getComponent(UITransform) ?? host.addComponent(UITransform);
+        transform.setContentSize(Math.max(digitH, totalW), digitH);
+        transform.setAnchorPoint(0.5, 0.5);
+        let cursor = -totalW / 2;
+        nodes.forEach((piece) => {
+            piece.node.setPosition(cursor + piece.width / 2, 0, 0);
+            cursor += piece.width + piece.after;
+        });
     }
 
     private loadImage(uuid: string): void {
