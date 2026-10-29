@@ -5,6 +5,7 @@
 
 import { LevelManager } from './LevelManager';
 import { SaveManager } from './SaveManager';
+import { profileAvatar } from '../ui/ProfileAvatars';
 
 export interface GameProfile {
     currentLevel: number;
@@ -19,8 +20,8 @@ export interface GameProfile {
 const DEFAULT_PROFILE: GameProfile = {
     currentLevel: 1,
     currentScene: 'Candy Fountain',
-    playerName: 'LadadLac',
-    avatarId: 'bear',
+    playerName: '',
+    avatarId: '1',
     bestScore: 0,
     featuredScene: 'Candy City Streets',
     achievementProgress: 0.62,
@@ -31,8 +32,8 @@ export class GameDataManager {
 
     public static getProfile(): GameProfile {
         const save = SaveManager.load();
-        if (save.playerName) this.profile.playerName = save.playerName;
-        if (save.avatarId) this.profile.avatarId = save.avatarId;
+        if (save.playerName && save.playerName !== 'LadadLac') this.profile.playerName = save.playerName;
+        if (save.avatarId) this.profile.avatarId = profileAvatar(save.avatarId).id;
         this.profile.currentLevel = LevelManager.getCurrentLevel();
         return this.profile;
     }

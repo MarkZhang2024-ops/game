@@ -1,7 +1,8 @@
 /**
- * Shared API settings. Flip USE_MOCK_LEADERBOARD when the real server is ready.
+ * Shared API settings.
  */
 
-export const API_BASE_URL = 'https://api.cluedoku.example';
-export const LEADERBOARD_API = '/leaderboard';
-export const USE_MOCK_LEADERBOARD = true;
+export const USER_API_BASE_URL = 'http://14.225.71.86:8000';
+export const GET_USER_API = '/user/getUser';
+export const GET_TOP_USERS_API = '/user/getTopUsers';
+export const UPDATE_USER_API = '/user/updateUser';

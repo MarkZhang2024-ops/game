@@ -104,11 +104,14 @@ export const LAYOUT = {
 
 export const GAME = {
     maxLives: 3,
-    hintsPerLevel: 3,
+    totalHints: 3,
     minSize: 4,
     maxSize: 16,
     scorePerSuspect: 100,
     scorePerSecondBonus: 10,
+    /** First clear of levels 15, 20, 25... shows one ad. */
+    levelAdStart: 15,
+    levelAdInterval: 5,
 };
 
 /** Set false after click-mapping is verified. */

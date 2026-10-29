@@ -14,6 +14,8 @@ import {
     UITransform,
     Color,
 } from 'cc';
+import { AndroidDeviceManager } from '../core/AndroidDeviceManager';
+import { UserService } from '../data/UserService';
 import { COLORS } from '../utils/Constants';
 
 const { ccclass } = _decorator;
@@ -24,6 +26,8 @@ export class SplashController extends Component {
     private readonly progress = { value: 0 };
 
     start(): void {
+        AndroidDeviceManager.initAndroidId().catch(() => undefined);
+        UserService.ensureUser().catch(() => undefined);
         this.layoutBar();
         this.startLoading();
         this.scheduleOnce(() => {

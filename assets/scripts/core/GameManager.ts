@@ -37,6 +37,8 @@ import { PuzzleSolver } from '../puzzle/PuzzleSolver';
 import { findUniqueNextMoves } from '../puzzle/UniqueReasoning';
 import { createBoardData, cloneBoard, countSuspects, BoardData } from '../puzzle/PuzzleTypes';
 import { GAME, CellMarkState, SuspectType } from '../utils/Constants';
+import { RewardedAd } from './RewardedAd';
+import { UserService } from '../data/UserService';
 import { applyGamePageLayout, findDeep } from '../ui/GamePageLayout';
 import { applySpriteFrame } from '../ui/GameArt';
 import { whiteFrame } from '../ui/UiKit';
@@ -67,6 +69,7 @@ export class GameManager extends Component {
     private hintEmptyBanner: Node | null = null;
     private hintPopup: HintPopup | null = null;
     private hintOpen = false;
+    private adBusy = false;
     private nextUniqueMove: { row: number; col: number; colorId: number } | null = null;
     private hintHighlights: { row: number; col: number }[] = [];
     private lastClickedRow = -1;
@@ -118,6 +121,7 @@ export class GameManager extends Component {
         this.bindSceneUI();
         view.on('canvas-resize', this.onScreenResize, this);
         try {
+            this.state.hints = this.savedHints();
             this.loadCurrentLevel();
             this.timerEnabled = true;
         } catch (e) {
@@ -336,7 +340,6 @@ export class GameManager extends Component {
 
         if (!PuzzleSolver.canPlace(board, row, col)) {
             view.shakeCell(row, col);
-            this.showToast('Illegal placement');
             this.loseLife();
             return;
         }
@@ -355,7 +358,7 @@ export class GameManager extends Component {
         this.dismissRuleHint();
         const level = this.levelManager.loadCurrentLevel();
         const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives, GAME.hintsPerLevel);
+        this.state.resetForLevel(level, board, GAME.maxLives);
         this.renderLevel();
     }
 
@@ -369,7 +372,7 @@ export class GameManager extends Component {
         this.timerEnabled = true;
         const level = this.levelManager.restartLevel();
         const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives, GAME.hintsPerLevel);
+        this.state.resetForLevel(level, board, GAME.maxLives);
         this.renderLevel();
     }
 
@@ -380,7 +383,7 @@ export class GameManager extends Component {
         this.dismissRuleHint();
         const level = this.levelManager.nextLevel();
         const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives, GAME.hintsPerLevel);
+        this.state.resetForLevel(level, board, GAME.maxLives);
         this.renderLevel();
     }
 
@@ -459,7 +462,6 @@ export class GameManager extends Component {
         const colorId = board.cells[row][col].color;
         if (!move || row !== move.row || col !== move.col || colorId !== move.colorId) {
             view.shakeCell(row, col);
-            this.showToast('Illegal placement');
             this.loseLife();
             return;
         }
@@ -473,33 +475,26 @@ export class GameManager extends Component {
     }
 
     private onTool(): void {
-        if (this.hintOpen || this.state.levelCompleted || this.state.lives <= 0) return;
+        if (this.adBusy || this.hintOpen || this.state.levelCompleted || this.state.lives <= 0) return;
         if (!this.state.board || !this.board) return;
-        if (this.isNewSuspectRuleEnabled()) {
-            this.flashUniqueMove();
-            return;
-        }
-        const pos = HintManager.pickAvailableSuspect(this.state.board);
-        if (!pos) {
-            this.showToast('No suspect available');
-            return;
-        }
-        HintManager.playHint(this.board, pos);
-        this.refreshProgress();
-        if (PuzzleSolver.isComplete(this.state.board)) {
-            this.onLevelCompleted();
-        }
+        this.watchToolAd();
     }
 
     private onHint(): void {
-        if (this.state.levelCompleted || this.state.lives <= 0) return;
+        if (this.adBusy || this.hintOpen || this.state.levelCompleted || this.state.lives <= 0) return;
+        if (!this.state.board || !this.board) return;
         if (this.state.hints <= 0) {
-            this.showHintEmptyBanner();
+            this.watchHintAd();
             return;
         }
+        this.giveHint(true);
+    }
+
+    /** Free hints are spent only before they run out. An ad hint does not change the count. */
+    private giveHint(spend: boolean): void {
         if (this.hintOpen || !this.state.board || !this.board) return;
         if (this.isNewSuspectRuleEnabled()) {
-            this.hintUniqueMove();
+            this.hintUniqueMove(spend);
             return;
         }
         const hint = HintManager.findHint(this.state.board, (row, col) => this.canMarkExcluded(row, col));
@@ -507,8 +502,7 @@ export class GameManager extends Component {
             this.showToast('No hint available');
             return;
         }
-        this.state.hints--;
-        this.hud?.setHintsLeft(this.state.hints);
+        if (spend) this.setHints(this.state.hints - 1);
         HintManager.playHint(this.board, { row: hint.row, col: hint.column });
         for (const cell of hint.excludedCells) {
             this.board.excludeCell(cell.row, cell.column);
@@ -527,7 +521,7 @@ export class GameManager extends Component {
      * Level 11+ Hint button: show the solver's next cell, then return the cell to normal.
      * Does not place a suspect.
      */
-    private hintUniqueMove(): void {
+    private hintUniqueMove(spend: boolean): void {
         if (!this.state.board || !this.board) return;
         this.syncNextUniqueMove();
         const move = this.nextUniqueMove;
@@ -535,8 +529,7 @@ export class GameManager extends Component {
             this.showToast('No hint available');
             return;
         }
-        this.state.hints--;
-        this.hud?.setHintsLeft(this.state.hints);
+        if (spend) this.setHints(this.state.hints - 1);
         this.unschedule(this.restoreHintFlash);
         this.clearHintHighlights();
         this.highlightHint(move.row, move.col);
@@ -614,7 +607,10 @@ export class GameManager extends Component {
         if (this.state.levelCompleted) return;
         this.state.levelCompleted = true;
         this.timerEnabled = false;
+        const before = LevelManager.getCurrentLevel();
         this.levelManager.completeLevel(this.state.currentLevel);
+        const unlocked = LevelManager.getCurrentLevel();
+        if (unlocked > before) UserService.updateLevel(unlocked).catch(() => undefined);
         const suspectScore = this.state.getRequiredSuspectCount() * GAME.scorePerSuspect;
         const timeBonus = Math.max(0, 300 - Math.floor(this.state.elapsedTime)) * GAME.scorePerSecondBonus;
         this.state.score = suspectScore + timeBonus + this.state.lives * 50;
@@ -624,12 +620,113 @@ export class GameManager extends Component {
             winStreak: (save.winStreak || 0) + 1,
         });
         this.levelComplete?.show(this.state.score, this.state.elapsedTime, this.state.currentLevel);
+        this.showLevelAd(unlocked > before);
+    }
+
+    /** First clear of levels 15, 20, 25... shows one ad. Replays do not. */
+    private showLevelAd(firstClear: boolean): void {
+        if (!firstClear) return;
+        const level = this.state.currentLevel;
+        if (level < GAME.levelAdStart || level % GAME.levelAdInterval !== 0) return;
+        if (RewardedAd.isBusy()) return;
+        RewardedAd.showRewardedAd('level', () => undefined, () => undefined);
     }
 
     private onGameOver(): void {
         this.timerEnabled = false;
         SaveManager.update({ winStreak: 0 });
         this.gameOver?.show(this.state.currentLevel);
+    }
+
+    /** Hint button only. One completed ad shows one hint and does not refill the free count. */
+    private watchHintAd(): void {
+        this.adBusy = true;
+        this.hud?.setHintBusy(true);
+        RewardedAd.showRewardedAd(
+            'hint',
+            () => this.onHintRewarded(),
+            (status) => this.onHintAdFailed(status),
+        );
+    }
+
+    private onHintRewarded(): void {
+        this.adBusy = false;
+        this.hud?.setHintBusy(false);
+        this.giveHint(false);
+    }
+
+    private onHintAdFailed(status: string): void {
+        if (status === 'busy') return;
+        this.adBusy = false;
+        this.hud?.setHintBusy(false);
+        this.showToast(this.adStatusText(status));
+    }
+
+    /** Tool button only. The ad must finish before the tool effect runs. */
+    private watchToolAd(): void {
+        this.adBusy = true;
+        this.hud?.setToolBusy(true);
+        RewardedAd.showRewardedAd(
+            'tool',
+            () => this.onToolRewarded(),
+            (status) => this.onToolAdFailed(status),
+        );
+    }
+
+    private onToolRewarded(): void {
+        this.adBusy = false;
+        this.hud?.setToolBusy(false);
+        this.applyToolEffect();
+    }
+
+    /** Original tool effect: place one suspect, or flash the unique move on level 11+. */
+    private applyToolEffect(): void {
+        if (this.hintOpen || this.state.levelCompleted || this.state.lives <= 0) return;
+        if (!this.state.board || !this.board) return;
+        if (this.isNewSuspectRuleEnabled()) {
+            this.flashUniqueMove();
+            return;
+        }
+        const pos = HintManager.pickAvailableSuspect(this.state.board);
+        if (!pos) {
+            this.showToast('No suspect available');
+            return;
+        }
+        HintManager.playHint(this.board, pos);
+        this.refreshProgress();
+        if (PuzzleSolver.isComplete(this.state.board)) {
+            this.onLevelCompleted();
+        }
+    }
+
+    /** Lifetime hint pool. Level changes do not refill it. */
+    private savedHints(): number {
+        const saved = SaveManager.load().hintsLeft;
+        if (typeof saved !== 'number' || !Number.isFinite(saved)) return GAME.totalHints;
+        return Math.max(0, Math.floor(saved));
+    }
+
+    private setHints(count: number): void {
+        this.state.hints = Math.max(0, Math.floor(count));
+        SaveManager.update({ hintsLeft: this.state.hints });
+        this.hud?.setHintsLeft(this.state.hints);
+    }
+
+    private onToolAdFailed(status: string): void {
+        if (status === 'busy') return;
+        this.adBusy = false;
+        this.hud?.setToolBusy(false);
+        this.showToast(this.adStatusText(status));
+    }
+
+    private adStatusText(status: string): string {
+        if (status === 'closed') return 'Ad closed';
+        if (status === 'not_ready') return 'Ad is not ready';
+        if (status === 'load_failed') return 'Ad failed to load';
+        if (status === 'show_failed') return 'Ad failed to show';
+        if (status === 'timeout') return 'Ad timed out';
+        if (status === 'unsupported') return 'Ads run on Android';
+        return 'Ad unavailable';
     }
 
     private showHintEmptyBanner(): void {

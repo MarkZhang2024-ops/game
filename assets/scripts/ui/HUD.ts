@@ -26,6 +26,8 @@ export class HUD extends Component {
     private heartGroup: Node | null = null;
     private hintLabel: Label | null = null;
     private hintsLeft = 3;
+    private hintBusy = false;
+    private toolBusy = false;
     private bound = false;
 
     protected onLoad(): void {
@@ -67,6 +69,22 @@ export class HUD extends Component {
     public setHintsLeft(hints: number): void {
         this.hintsLeft = Math.max(0, hints);
         this.refreshHintBadge();
+    }
+
+    /** Ignores extra taps and dims the hint button while an ad request is open. */
+    public setHintBusy(busy: boolean): void {
+        this.hintBusy = busy;
+        const button = findDeep(this.findCanvas(), 'HintButton');
+        const sprite = button?.getComponent(Sprite);
+        if (sprite) sprite.color = busy ? new Color(255, 255, 255, 150) : Color.WHITE;
+    }
+
+    /** Ignores extra taps and dims the tool button while an ad request is open. */
+    public setToolBusy(busy: boolean): void {
+        this.toolBusy = busy;
+        const button = findDeep(this.findCanvas(), 'ToolButton');
+        const sprite = button?.getComponent(Sprite);
+        if (sprite) sprite.color = busy ? new Color(255, 255, 255, 150) : Color.WHITE;
     }
 
     /** Count sits on its own child so it cannot hide the button sprite, and it stays up. */
@@ -128,10 +146,18 @@ export class HUD extends Component {
         if (this.bound) return;
         this.bound = true;
 
-        findDeep(top, 'SettingButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onSettingsPressed());
+        const settingButton = findDeep(top, 'SettingButton');
+        if (settingButton) settingButton.active = false;
+        settingButton?.on(Node.EventType.TOUCH_END, () => this.cb?.onSettingsPressed());
         findDeep(top, 'BackButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onBackPressed());
-        findDeep(bottom, 'HintButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onHintPressed());
-        findDeep(bottom, 'ToolButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onToolPressed());
+        findDeep(bottom, 'HintButton')?.on(Node.EventType.TOUCH_END, () => {
+            if (this.hintBusy) return;
+            this.cb?.onHintPressed();
+        });
+        findDeep(bottom, 'ToolButton')?.on(Node.EventType.TOUCH_END, () => {
+            if (this.toolBusy) return;
+            this.cb?.onToolPressed();
+        });
     }
 
     private findCanvas(): Node | null {

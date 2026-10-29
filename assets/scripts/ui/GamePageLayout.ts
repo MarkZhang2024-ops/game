@@ -387,8 +387,10 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     const settingX = sw / 2 - (m.designWidth - m.settingCenterX) * unit;
     setSize(findDeep(top, 'BackButton'), topBtn, topBtn);
     at(findDeep(top, 'BackButton'), backX, 0);
-    setSize(findDeep(top, 'SettingButton'), topBtn, topBtn);
-    at(findDeep(top, 'SettingButton'), settingX, 0);
+    const settingButton = findDeep(top, 'SettingButton');
+    setSize(settingButton, topBtn, topBtn);
+    at(settingButton, settingX, 0);
+    if (settingButton) settingButton.active = false;
     const bannerW = m.bannerWidth * unit;
     const bannerH = m.bannerHeight * unit;
     const banner = findDeep(top, 'LevelBanner');

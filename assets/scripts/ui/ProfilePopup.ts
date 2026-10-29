@@ -17,6 +17,7 @@ import {
     Widget,
 } from 'cc';
 import { GameDataManager } from '../core/GameDataManager';
+import { UserService } from '../data/UserService';
 import { loadSpriteFrame } from './GameArt';
 import { PROFILE_AVATARS, profileAvatar } from './ProfileAvatars';
 import { addButton, addLabel, applySprite, stretch, uiNode, whiteFrame } from './UiKit';
@@ -270,10 +271,19 @@ export class ProfilePopup extends Component {
 
     private onSave(): void {
         const typed = this.nameEdit?.string.trim() ?? '';
-        const current = GameDataManager.getProfile().playerName;
+        const profile = GameDataManager.getProfile();
+        const current = profile.playerName;
+        const previousAvatar = profileAvatar(profile.avatarId).id;
         const name = (typed || current).slice(0, NAME_LIMIT);
+        const nextAvatar = profileAvatar(this.draftAvatar).id;
         GameDataManager.setPlayerName(name);
-        GameDataManager.setAvatarId(this.draftAvatar);
+        GameDataManager.setAvatarId(nextAvatar);
+        const change: { username?: string; avatarId?: string } = {};
+        if (name !== current) change.username = name;
+        if (nextAvatar !== previousAvatar) change.avatarId = nextAvatar;
+        if (change.username || change.avatarId) {
+            UserService.updateProfile(change).catch(() => undefined);
+        }
         this.close();
         this.savedHandler?.();
     }

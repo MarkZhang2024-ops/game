@@ -15,6 +15,8 @@ export interface SaveData {
     winStreak: number;
     playerName: string;
     avatarId: string;
+    /** Remaining hints for the whole game. Level changes do not refill this. */
+    hintsLeft: number;
 }
 
 export class GameState {
@@ -23,20 +25,17 @@ export class GameState {
     public maxLives = 3;
     public elapsedTime = 0;
     public hints = 3;
-    public maxHints = 3;
     public score = 0;
     public levelCompleted = false;
     public level: LevelConfig | null = null;
     public board: BoardData | null = null;
 
-    public resetForLevel(level: LevelConfig, board: BoardData, maxLives: number, maxHints: number): void {
+    public resetForLevel(level: LevelConfig, board: BoardData, maxLives: number): void {
         this.level = level;
         this.board = board;
         this.currentLevel = level.level;
         this.maxLives = maxLives;
         this.lives = maxLives;
-        this.maxHints = maxHints;
-        this.hints = maxHints;
         this.elapsedTime = 0;
         this.levelCompleted = false;
         this.score = 0;

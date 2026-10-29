@@ -6,6 +6,7 @@
  */
 
 import { SaveData } from './GameState';
+import { GAME } from '../utils/Constants';
 
 const STORAGE_KEY = 'cluedoku_save_v2';
 
@@ -17,8 +18,9 @@ const DEFAULT_SAVE: SaveData = {
     vibrationOn: true,
     bellOn: true,
     winStreak: 0,
-    playerName: 'LadadLac',
-    avatarId: 'bear',
+    playerName: '',
+    avatarId: '1',
+    hintsLeft: GAME.totalHints,
 };
 
 export class SaveManager {
@@ -63,6 +65,7 @@ export class SaveManager {
         data.currentLevel = 1;
         data.highScore = 0;
         data.winStreak = 0;
+        data.hintsLeft = GAME.totalHints;
         this.save(data);
         return data;
     }

@@ -189,6 +189,7 @@ export class LevelPage extends Component {
 
         const settings = uiNode('SettingsButton', 164, 164);
         settings.setParent(top);
+        settings.active = false;
         this.settingsButton = addButton(settings, 0.92);
         const settingsSprite = settings.addComponent(Sprite);
         settingsSprite.sizeMode = Sprite.SizeMode.CUSTOM;
