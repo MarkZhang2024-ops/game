@@ -15,7 +15,9 @@ const TILE_GREEN = 'fdd94f04-804b-425f-8935-5741629b0d41@f9941';
 const TILE_PINK = 'a10fa827-d36c-4f85-9583-f74330a4a870@f9941';
 
 export const MARK_X_FRAME = '96544d3f-edc0-449b-ba43-0c4fcde8c43d@f9941';
-export const SUSPECT_FRAME = '01b5b235-cc6b-47e1-9051-9fe11838336f@f9941';
+/** Green swirl candy placed on a cell. 132×117. The progress-plate bear stays separate. */
+export const SUSPECT_FRAME = 'ae70aea7-ebc6-4465-a628-8843b0c15861@f9941';
+export const SUSPECT_SIZE = { width: 132, height: 117 };
 
 /** Sprite frames under assets/prefabs/cutpicture/game. */
 export const GAME_FRAMES = {
@@ -27,7 +29,7 @@ export const GAME_FRAMES = {
     plate: '4417914f-2989-4d71-9ed2-4d12af0e1009@f9941',
     bear: '01b5b235-cc6b-47e1-9051-9fe11838336f@f9941',
     heart: 'dbec840c-7095-42d1-8a60-4ec04e70d6cb@f9941',
-    frame: 'f9c3558a-a387-4d69-a496-61d52b5ec079@f9941',
+    frame: '9860fa59-f476-5121-bf06-3a0463fa8148@f9941',
     hint: '1da40428-dd49-40bf-bdb4-7ce9095c8765@f9941',
     tool: '02e8f773-3761-4831-82ad-99c81f8858ab@f9941',
 } as const;

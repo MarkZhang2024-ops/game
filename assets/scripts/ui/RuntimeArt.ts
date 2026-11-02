@@ -4,7 +4,7 @@
  * load by uuid string. Those strings are not build dependencies on their own.
  */
 
-import { _decorator, Component, Prefab, SpriteFrame } from 'cc';
+import { _decorator, Component, Font, Prefab, SpriteFrame } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -15,4 +15,8 @@ export class RuntimeArt extends Component {
 
     @property([Prefab])
     public prefabs: Prefab[] = [];
+
+    /** Rounded bold face used by the level card values. */
+    @property(Font)
+    public roundedFont: Font | null = null;
 }

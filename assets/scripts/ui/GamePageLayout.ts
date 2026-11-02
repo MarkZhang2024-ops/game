@@ -9,28 +9,61 @@
  * Click mapping is unchanged: Board converts UI location with
  * convertToNodeSpaceAR, which includes this node's position and scale.
  *
- * TODO: the level title in the comp is a rounded display face. This project
- * has no font file, so the label uses the system bold face on 关卡框.png.
+ * The level title and the placed counter are sprite digits from 关卡数字 and 生命值.
  */
 
-import { Color, Label, Node, RichText, Sprite, sys, UITransform, view } from 'cc';
+import { Color, Graphics, Label, Node, Sprite, sys, UITransform, view } from 'cc';
 import { applySpriteFrame, GAME_FRAMES } from './GameArt';
+import { fillDigits, GlyphSet, showFrame } from './LeaderboardArt';
 import { whiteFrame } from './UiKit';
+
+const LEVEL_WORD = { frame: 'd2cb0e9e-b7b5-50bf-91b2-a09b9df746f2@f9941', width: 171, height: 53 };
+const LEVEL_DIGITS: GlyphSet = {
+    frames: [
+        '95123b7e-e1f8-5613-8907-851aa5690af9@f9941',
+        '076b62b7-3f1c-5733-8666-eba69f89c5cb@f9941',
+        '173b306a-1c2e-5358-a0bf-1a642d148b5e@f9941',
+        '3ae48758-f8e8-5a27-9a5c-46f987433562@f9941',
+        '18a41c48-5177-59ac-98d0-c289df99702e@f9941',
+        'f68c219f-70b1-5cde-8629-9a5740402e16@f9941',
+        'd00508eb-867c-5f05-a394-b6afd61dbac9@f9941',
+        'aea4fdb4-a063-502e-93aa-2de707459ddc@f9941',
+        '9c4796cd-27e4-56ed-ba55-578373be7c9d@f9941',
+        'ba3a350b-f3c0-5e2f-a5b3-b66541ff983c@f9941',
+    ],
+    sizes: Array.from({ length: 10 }, () => [36, 50]),
+};
+const COUNTER_DIGITS: GlyphSet = {
+    frames: [
+        'b16e8783-d2ee-509b-ac09-70cf7e31fd46@f9941',
+        '51094391-55b2-5cb9-88b1-548d45edeafe@f9941',
+        'aff9585f-cbbd-5155-8b4b-d33933a6ade5@f9941',
+        'b4c2aa22-7ad0-53ea-a964-4bfc5a2fff4d@f9941',
+        'ee2d30a6-f57c-5e04-953c-9289d6ecf6c7@f9941',
+        'fdf94322-4e99-5a4f-a049-73c322672969@f9941',
+        '45d36793-f523-5b14-be99-d930cea9c660@f9941',
+        '9b4ba47d-da25-5f2f-a9f3-58976eddbfb7@f9941',
+        '905fcfb0-4bcf-538e-bee5-de128829a0f1@f9941',
+        'd85897a3-7276-59f2-8ab3-963e6499e884@f9941',
+    ],
+    sizes: Array.from({ length: 10 }, () => [45, 65]),
+};
+const COUNTER_SLASH = { frame: '0ab247c7-0418-538e-b008-b1f62f90cec0@f9941', width: 29, height: 92 };
 
 export const GAME_UI = {
     designWidth: 1080,
     designHeight: 2400,
-    topRowFromTop: 186,
+    topRowFromTop: 188,
     topButton: 198,
     backCenterX: 150,
-    settingCenterX: 930,
+    settingCenterX: 934,
     bannerWidth: 458,
     bannerHeight: 172,
-    ruleFromTop: 410,
+    ruleFromTop: 417,
     ruleWidth: 1020,
     ruleHeight: 191,
-    playerFromTop: 632,
-    progressCenterX: 248,
+    playerFromTop: 639,
+    progressCenterX: 318,
     progressWidth: 416,
     progressHeight: 144,
     heartCenterX: 762,
@@ -40,23 +73,28 @@ export const GAME_UI = {
     bearHeight: 172,
     heartIconW: 109,
     heartIconH: 98,
-    heartGap: 18,
+    heartGap: -2,
     frameWidth: 1020,
-    frameHeight: 1020,
-    /** Inner pink hole of 游戏主框.png, measured on the 1020×1228 source. */
-    frameInsetLeft: 64 / 1020,
-    frameInsetRight: 65 / 1020,
-    frameInsetTop: 83 / 1228,
-    frameInsetBottom: 71 / 1228,
-    bottomFromBottom: 254,
+    frameHeight: 1033,
+    /** Inner cream hole of 框.png, 1020×1033. */
+    frameInsetLeft: 62 / 1020,
+    frameInsetRight: 52 / 1020,
+    frameInsetTop: 68 / 1033,
+    frameInsetBottom: 47 / 1033,
+    bottomFromBottom: 235,
     bottomButtonWidth: 232,
     bottomButtonHeight: 253,
-    bottomButtonSpacing: 380,
-    bandGap: 18,
+    bottomButtonSpacing: 305,
+    bandGap: 12,
+    /** Top of 框.png. The candy grid starts just inside this, under the waterfall. */
+    frameTopFromTop: 850,
 };
 
 let fittedFrameW = 0;
 let fittedFrameH = 0;
+let shownLevel = 1;
+let shownPlaced = 0;
+let shownRequired = 1;
 
 export function findDeep(root: Node | null, name: string): Node | null {
     if (!root) return null;
@@ -169,25 +207,138 @@ function hideCaption(node: Node | null): void {
     if (label) label.enabled = false;
 }
 
-/** Level title sits on 关卡框.png. The scene node may still be a RichText placeholder. */
-function ensureLevelText(node: Node | null): void {
-    if (!node) return;
-    const rich = node.getComponent(RichText);
-    if (rich) rich.enabled = false;
-    const sprite = node.getComponent(Sprite);
-    if (sprite) sprite.enabled = false;
-    let label = node.getComponent(Label);
-    if (!label) {
-        label = node.addComponent(Label);
-        label.string = 'Level 4';
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        label.verticalAlign = Label.VerticalAlign.CENTER;
-        label.useSystemFont = true;
-        label.fontFamily = 'Arial';
-        label.cacheMode = Label.CacheMode.NONE;
+function artHost(parent: Node, name: string): Node {
+    let node = parent.getChildByName(name);
+    if (!node) {
+        node = new Node(name);
+        node.layer = parent.layer;
+        const transform = node.addComponent(UITransform);
+        transform.setAnchorPoint(0.5, 0.5);
+        node.setParent(parent);
     }
-    label.enabled = true;
-    label.isBold = true;
+    return node;
+}
+
+function fresh(parent: Node, name: string): Node {
+    const node = new Node(name);
+    node.layer = parent.layer;
+    const transform = node.addComponent(UITransform);
+    transform.setAnchorPoint(0.5, 0.5);
+    node.setParent(parent);
+    return node;
+}
+
+/** "Level" plus the level number, centered on the banner. */
+export function paintLevelTitle(banner: Node | null, level?: number): void {
+    if (level != null) shownLevel = Math.max(0, Math.floor(level));
+    if (!banner?.isValid) return;
+    const old = findDeep(banner, 'LevelLabel');
+    if (old) old.active = false;
+    const height = banner.getComponent(UITransform)?.height ?? 0;
+    if (height < 2) return;
+    const art = artHost(banner, 'LevelArt');
+    art.removeAllChildren();
+    // Sprites were cut for the 172px banner: digits 50px, word 53px, with a full space before the number.
+    const digitH = height * (50 / 172);
+    const wordH = height * (LEVEL_WORD.height / 172);
+    const wordW = height * (LEVEL_WORD.width / 172);
+    const gap = digitH * 0.62;
+    const digits = fresh(art, 'Digits');
+    const digitsW = fillDigits(digits, shownLevel, digitH, LEVEL_DIGITS);
+    const total = wordW + gap + digitsW;
+    const word = fresh(art, 'Word');
+    word.getComponent(UITransform)?.setContentSize(wordW, wordH);
+    showFrame(word.getComponent(Sprite) ?? word.addComponent(Sprite), LEVEL_WORD.frame);
+    word.setPosition(-total / 2 + wordW / 2, 0, 0);
+    const digitDrop = (wordH - digitH) / 2;
+    digits.setPosition(-total / 2 + wordW + gap + digitsW / 2, -digitDrop, 0);
+    art.getComponent(UITransform)?.setContentSize(total, Math.max(wordH, digitH));
+    art.setPosition(0, height * 0.02, 0);
+}
+
+/**
+ * Remaining free hints sit on the magnifier badge.
+ * At zero the badge is hidden so 图案1.png's video triangle shows.
+ */
+export function paintHintCount(button: Node | null, count: number): void {
+    if (!button?.isValid) return;
+    let badge = button.getChildByName('HintCount');
+    if (count <= 0) {
+        if (badge) badge.active = false;
+        return;
+    }
+    if (!badge) {
+        badge = new Node('HintCount');
+        badge.layer = button.layer;
+        const root = badge.addComponent(UITransform);
+        root.setAnchorPoint(0.5, 0.5);
+        button.addChild(badge);
+        const cover = new Node('Cover');
+        cover.layer = button.layer;
+        const coverUt = cover.addComponent(UITransform);
+        coverUt.setAnchorPoint(0.5, 0.5);
+        cover.addComponent(Graphics);
+        cover.setParent(badge);
+        const digits = new Node('Digits');
+        digits.layer = button.layer;
+        const digitsUt = digits.addComponent(UITransform);
+        digitsUt.setAnchorPoint(0.5, 0.5);
+        digits.setParent(badge);
+    }
+    badge.active = true;
+    badge.layer = button.layer;
+    badge.setSiblingIndex(button.children.length - 1);
+    const width = button.getComponent(UITransform)?.width ?? 232;
+    const height = button.getComponent(UITransform)?.height ?? 253;
+    badge.setPosition(0, -height * 0.326, 0);
+    const coverW = width * (78 / 232);
+    const coverH = height * (54 / 253);
+    const cover = badge.getChildByName('Cover');
+    cover?.getComponent(UITransform)?.setContentSize(coverW, coverH);
+    const graphics = cover?.getComponent(Graphics);
+    if (graphics) {
+        graphics.clear();
+        graphics.fillColor = new Color(1, 186, 244, 255);
+        const radius = coverH * 0.42;
+        graphics.roundRect(-coverW / 2, -coverH / 2, coverW, coverH, radius);
+        graphics.fill();
+    }
+    const digits = badge.getChildByName('Digits');
+    if (digits) fillDigits(digits, count, height * (38 / 253), LEVEL_DIGITS);
+}
+
+/** Brown "placed/required" sprites on the progress plate, to the right of the bear. */
+export function paintProgressCounter(plate: Node | null, placed?: number, required?: number): void {
+    if (placed != null) shownPlaced = Math.max(0, Math.floor(placed));
+    if (required != null) shownRequired = Math.max(0, Math.floor(required));
+    if (!plate?.isValid) return;
+    const old = findDeep(plate, 'ProgressLabel');
+    if (old) old.active = false;
+    const plateW = plate.getComponent(UITransform)?.width ?? 0;
+    const plateH = plate.getComponent(UITransform)?.height ?? 0;
+    if (plateH < 2) return;
+    const art = artHost(plate, 'ProgressArt');
+    art.removeAllChildren();
+    const digitH = plateH * 0.48;
+    const gap = Math.max(1, digitH * 0.06);
+    const slashH = digitH;
+    const slashW = slashH * (COUNTER_SLASH.width / COUNTER_SLASH.height);
+    const left = fresh(art, 'Placed');
+    const slash = fresh(art, 'Slash');
+    const right = fresh(art, 'Required');
+    const leftW = fillDigits(left, shownPlaced, digitH, COUNTER_DIGITS);
+    const rightW = fillDigits(right, shownRequired, digitH, COUNTER_DIGITS);
+    slash.getComponent(UITransform)?.setContentSize(slashW, slashH);
+    showFrame(slash.getComponent(Sprite) ?? slash.addComponent(Sprite), COUNTER_SLASH.frame);
+    const total = leftW + gap + slashW + gap + rightW;
+    let cursor = -total / 2;
+    left.setPosition(cursor + leftW / 2, 0, 0);
+    cursor += leftW + gap;
+    slash.setPosition(cursor + slashW / 2, 0, 0);
+    cursor += slashW + gap;
+    right.setPosition(cursor + rightW / 2, 0, 0);
+    art.getComponent(UITransform)?.setContentSize(total, digitH);
+    art.setPosition(plateW * 0.171, plateH * 0.035, 0);
 }
 
 /**
@@ -206,7 +357,7 @@ function ensureGameChrome(canvas: Node): void {
 
     const banner = claim(top, 'LevelBanner', canvas);
     const levelLabel = claim(banner, 'LevelLabel', canvas);
-    ensureLevelText(levelLabel);
+    levelLabel.active = false;
     const progress = claim(player, 'ProgressPlate', canvas);
     claim(progress, 'Character', canvas);
     claim(progress, 'ProgressLabel', canvas);
@@ -276,20 +427,8 @@ function dressDimmer(popup: Node | null): void {
     setSize(dim, 1600, 3200);
 }
 
-function layoutLevelLabel(banner: Node | null, bannerW: number, bannerH: number): void {
-    const labelNode = findDeep(banner, 'LevelLabel');
-    setSize(labelNode, bannerW * 0.72, bannerH * 0.52);
-    at(labelNode, 0, -bannerH * 0.02);
-    const label = labelNode?.getComponent(Label);
-    if (!label) return;
-    label.fontSize = Math.max(20, Math.round(bannerH * 0.38));
-    label.lineHeight = Math.max(24, Math.round(bannerH * 0.44));
-    label.isBold = true;
-    label.overflow = Label.Overflow.SHRINK;
-    label.color = new Color(255, 255, 255, 255);
-    label.enableOutline = true;
-    label.outlineWidth = Math.max(2, Math.round(bannerH * 0.035));
-    label.outlineColor = new Color(90, 42, 18, 255);
+function layoutLevelLabel(banner: Node | null): void {
+    paintLevelTitle(banner);
 }
 
 function layoutProgressContents(plate: Node | null, unit: number): void {
@@ -300,17 +439,8 @@ function layoutProgressContents(plate: Node | null, unit: number): void {
     const bearH = GAME_UI.bearHeight * unit;
     const bear = findDeep(plate, 'Character');
     setSize(bear, bearW, bearH);
-    at(bear, -plateW * 0.5 + bearW * 0.42, bearH * 0.06);
-    const labelNode = findDeep(plate, 'ProgressLabel');
-    setSize(labelNode, plateW * 0.48, plateH * 0.7);
-    at(labelNode, plateW * 0.16, 0);
-    const label = labelNode?.getComponent(Label);
-    if (!label) return;
-    label.fontSize = Math.max(18, Math.round(plateH * 0.4));
-    label.lineHeight = Math.max(20, Math.round(plateH * 0.46));
-    label.isBold = true;
-    label.overflow = Label.Overflow.SHRINK;
-    label.color = new Color(92, 52, 28, 255);
+    at(bear, -plateW * 0.5 + 117 * unit, 18 * unit);
+    paintProgressCounter(plate);
 }
 
 function layoutHearts(plate: Node | null, unit: number): void {
@@ -377,8 +507,7 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     dressDimmer(findDeep(canvas, 'GameOver'));
     dressDimmer(findDeep(canvas, 'SettingsPanel'));
 
-    const buttonScale = 2 / 3;
-    const topBtn = m.topButton * unit * buttonScale;
+    const topBtn = m.topButton * unit;
     const topY = sh / 2 - m.topRowFromTop * unit;
     const top = findDeep(canvas, 'TopUI');
     setSize(top, sw, topBtn + 16 * unit);
@@ -390,13 +519,13 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     const settingButton = findDeep(top, 'SettingButton');
     setSize(settingButton, topBtn, topBtn);
     at(settingButton, settingX, 0);
-    if (settingButton) settingButton.active = false;
+    if (settingButton) settingButton.active = true;
     const bannerW = m.bannerWidth * unit;
     const bannerH = m.bannerHeight * unit;
     const banner = findDeep(top, 'LevelBanner');
     setSize(banner, bannerW, bannerH);
     at(banner, 0, 0);
-    layoutLevelLabel(banner, bannerW, bannerH);
+    layoutLevelLabel(banner);
 
     const ruleW = Math.min(m.ruleWidth * unit, sw - 24 * unit);
     const ruleH = ruleW * (m.ruleHeight / m.ruleWidth);
@@ -421,12 +550,18 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     layoutHearts(hearts, unit);
 
     const bottomH = m.bottomButtonHeight * unit;
-    const bottomY = -sh / 2 + m.bottomFromBottom * unit;
+    // Pin to the screen bottom, not the safe rect, so the pair sits on the pink ground.
+    const worldY = -height / 2 + m.bottomFromBottom * unit;
+    const bottomLocalY = worldY - safeY;
     const bottom = findDeep(canvas, 'BottomUI');
     setSize(bottom, sw, bottomH + 20 * unit);
-    place(bottom, 0, bottomY, safeX, safeY);
-    const btnW = m.bottomButtonWidth * unit * buttonScale;
-    const btnH = m.bottomButtonHeight * unit * buttonScale;
+    if (bottom?.parent?.name === 'SafeArea') {
+        bottom.setPosition(-safeX, bottomLocalY, 0);
+    } else {
+        bottom.setPosition(0, worldY, 0);
+    }
+    const btnW = m.bottomButtonWidth * unit;
+    const btnH = m.bottomButtonHeight * unit;
     const halfSpan = m.bottomButtonSpacing * unit * 0.5;
     setSize(findDeep(bottom, 'HintButton'), btnW, btnH);
     setSize(findDeep(bottom, 'ToolButton'), btnW, btnH);
@@ -434,16 +569,16 @@ export function applyGamePageLayout(canvas: Node, resizeBoard: boolean): void {
     at(findDeep(bottom, 'ToolButton'), halfSpan, 0);
     if (bottom?.parent) bottom.setSiblingIndex(bottom.parent.children.length - 1);
 
-    const playerBottom = playerY - progressH / 2 - m.bandGap * unit;
-    const buttonTop = bottomY + bottomH / 2 + m.bandGap * unit;
-    const available = Math.max(200 * unit, playerBottom - buttonTop);
+    const frameTop = sh / 2 - m.frameTopFromTop * unit;
+    const buttonTop = bottomLocalY + bottomH / 2 + m.bandGap * unit;
+    const available = Math.max(200 * unit, frameTop - buttonTop);
     const maxFrameW = Math.max(200 * unit, sw - 30 * unit);
     const nativeW = m.frameWidth * unit;
     const nativeH = m.frameHeight * unit;
     const frameScale = Math.min(1, maxFrameW / nativeW, available / nativeH);
     const frameW = nativeW * frameScale;
     const frameH = nativeH * frameScale;
-    const frameY = (playerBottom + buttonTop) / 2;
+    const frameY = frameTop - frameH / 2;
 
     const gameArea = findDeep(canvas, 'GameArea');
     const frame = findDeep(canvas, 'BoardFrame');

@@ -4,9 +4,9 @@
  */
 
 import {
-    _decorator, Color, Component, Label, Node, RichText, Sprite, UITransform,
+    _decorator, Color, Component, Label, Node, RichText, Sprite,
 } from 'cc';
-import { findDeep } from './GamePageLayout';
+import { findDeep, paintHintCount, paintLevelTitle, paintProgressCounter } from './GamePageLayout';
 
 const { ccclass } = _decorator;
 
@@ -42,11 +42,11 @@ export class HUD extends Component {
     public setCallbacks(cb: HudCallbacks): void { this.cb = cb; }
 
     public setLevel(level: number): void {
-        if (this.levelLabel) this.levelLabel.string = `Level ${level}`;
+        paintLevelTitle(findDeep(this.findCanvas(), 'LevelBanner'), level);
     }
 
     public setProgress(placed: number, required: number): void {
-        if (this.progressLabel) this.progressLabel.string = `${placed}/${required}`;
+        paintProgressCounter(findDeep(this.findCanvas(), 'ProgressPlate'), placed, required);
     }
 
     public setHearts(lives: number, max: number): void {
@@ -87,44 +87,9 @@ export class HUD extends Component {
         if (sprite) sprite.color = busy ? new Color(255, 255, 255, 150) : Color.WHITE;
     }
 
-    /** Count sits on its own child so it cannot hide the button sprite, and it stays up. */
+    /** A remaining count covers the play icon. Zero reveals the video triangle. */
     private refreshHintBadge(): void {
-        const canvas = this.findCanvas();
-        const button = findDeep(canvas, 'HintButton');
-        if (!button) return;
-        let badge = button.getChildByName('HintCount');
-        if (!badge) {
-            badge = new Node('HintCount');
-            badge.layer = button.layer;
-            const created = badge.addComponent(UITransform);
-            created.setAnchorPoint(0.5, 0.5);
-            const createdLabel = badge.addComponent(Label);
-            createdLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-            createdLabel.verticalAlign = Label.VerticalAlign.CENTER;
-            createdLabel.overflow = Label.Overflow.SHRINK;
-            createdLabel.isBold = true;
-            createdLabel.useSystemFont = true;
-            createdLabel.fontFamily = 'Arial';
-            createdLabel.enableOutline = true;
-            createdLabel.outlineColor = new Color(70, 30, 12, 255);
-            button.addChild(badge);
-        }
-        badge.layer = button.layer;
-        badge.active = true;
-        const buttonUt = button.getComponent(UITransform);
-        const width = buttonUt?.width ?? 232;
-        const height = buttonUt?.height ?? 253;
-        const badgeUt = badge.getComponent(UITransform)!;
-        badgeUt.setContentSize(width * 0.42, height * 0.28);
-        badge.setPosition(0, -height * 0.3, 0);
-        const label = badge.getComponent(Label)!;
-        const font = Math.max(22, Math.round(height * 0.2));
-        label.fontSize = font;
-        label.lineHeight = font + 4;
-        label.outlineWidth = Math.max(2, Math.round(font * 0.12));
-        label.color = Color.WHITE;
-        label.string = `${this.hintsLeft}`;
-        this.hintLabel = label;
+        paintHintCount(findDeep(this.findCanvas(), 'HintButton'), this.hintsLeft);
     }
 
     private bindScene(): void {
@@ -147,7 +112,7 @@ export class HUD extends Component {
         this.bound = true;
 
         const settingButton = findDeep(top, 'SettingButton');
-        if (settingButton) settingButton.active = false;
+        if (settingButton) settingButton.active = true;
         settingButton?.on(Node.EventType.TOUCH_END, () => this.cb?.onSettingsPressed());
         findDeep(top, 'BackButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onBackPressed());
         findDeep(bottom, 'HintButton')?.on(Node.EventType.TOUCH_END, () => {

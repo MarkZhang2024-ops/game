@@ -19,8 +19,8 @@ import {
     Sprite,
 } from 'cc';
 import { CellColor, CELL_COLOR_HEX } from '../puzzle/PuzzleTypes';
-import { COLORS, LAYOUT, DEBUG_CLICK, CellMarkState, SuspectType } from '../utils/Constants';
-import { applySpriteFrame, MARK_X_FRAME, SUSPECT_FRAME, tileFrameFor } from '../ui/GameArt';
+import { COLORS, LAYOUT, cellInset, DEBUG_CLICK, CellMarkState, SuspectType } from '../utils/Constants';
+import { applySpriteFrame, MARK_X_FRAME, SUSPECT_FRAME, SUSPECT_SIZE, tileFrameFor } from '../ui/GameArt';
 import { CellPressEffect } from './CellPressEffect';
 import { JellySuspect } from './JellySuspect';
 
@@ -117,7 +117,7 @@ export class Cell extends Component {
     private applyTileArt(): void {
         const sprite = this.colorSprite;
         if (!sprite || this.cellSize <= 0) return;
-        const inset = LAYOUT.cellGap;
+        const inset = cellInset(this.cellSize);
         const visual = Math.max(8, this.cellSize - inset * 2);
         const ut = sprite.node.getComponent(UITransform);
         ut?.setContentSize(visual, visual);
@@ -153,7 +153,8 @@ export class Cell extends Component {
             ut.setContentSize(this.cellSize, this.cellSize);
         }
         if (colorNode) {
-            colorNode.getComponent(UITransform)!.setContentSize(Math.max(8, this.cellSize - LAYOUT.cellGap * 2), Math.max(8, this.cellSize - LAYOUT.cellGap * 2));
+            const inset = cellInset(this.cellSize);
+            colorNode.getComponent(UITransform)!.setContentSize(Math.max(8, this.cellSize - inset * 2), Math.max(8, this.cellSize - inset * 2));
         }
     }
 
@@ -374,8 +375,10 @@ export class Cell extends Component {
         this.suspectAnchor.active = this.markState === CellMarkState.SUSPECT;
         this.suspectNode = this.suspectAnchor;
         const ut = this.suspectAnchor.getComponent(UITransform) || this.suspectAnchor.addComponent(UITransform);
-        const visual = Math.max(8, Math.round(this.cellSize * 0.82));
-        ut.setContentSize(visual, visual);
+        ut.setAnchorPoint(0.5, 0.5);
+        const width = Math.max(8, Math.round(this.cellSize * 0.77));
+        const height = Math.max(8, Math.round(width * SUSPECT_SIZE.height / SUSPECT_SIZE.width));
+        ut.setContentSize(width, height);
         const sprite = this.suspectAnchor.getComponent(Sprite) || this.suspectAnchor.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         applySpriteFrame(sprite, SUSPECT_FRAME);
@@ -422,7 +425,7 @@ export class Cell extends Component {
         g.clear();
         const cs = this.cellSize;
         const half = cs / 2;
-        const gap = LAYOUT.cellGap;
+        const gap = cellInset(cs);
         const radius = Math.max(3, Math.floor(cs * LAYOUT.cellRadiusRatio));
         const drawW = cs - 2 * gap;
         const drawH = cs - 2 * gap;
@@ -474,7 +477,7 @@ export class Cell extends Component {
         }
         const ut = mark.getComponent(UITransform) || mark.addComponent(UITransform);
         ut.setAnchorPoint(0.5, 0.5);
-        const visual = Math.max(8, Math.round(this.cellSize * 0.78));
+        const visual = Math.max(8, Math.round((this.cellSize - cellInset(this.cellSize) * 2) * 0.88));
         ut.setContentSize(visual, visual);
 
         this.xSprite = mark.getComponent(Sprite) || mark.addComponent(Sprite);
