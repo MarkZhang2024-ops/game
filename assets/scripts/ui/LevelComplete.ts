@@ -229,8 +229,9 @@ export class LevelComplete extends Component {
         const track = progress?.getChildByName('Track') || null;
         this.placeArt(track, 0, 0, trackW, trackH);
 
-        const inset = trackW * 0.055;
-        const fillW = trackW - inset * 2;
+        const rightInset = trackW * 0.055;
+        const leftInset = trackW * (27 / 648);
+        const fillW = trackW - leftInset - rightInset;
         const fillH = trackH * 0.62;
         const fill = progress?.getChildByName('Fill') || null;
         const fillUt = fill?.getComponent(UITransform) || fill?.addComponent(UITransform);
@@ -238,7 +239,9 @@ export class LevelComplete extends Component {
             fillUt.setAnchorPoint(0, 0.5);
             fillUt.setContentSize(fillW, fillH);
         }
-        fill?.setPosition(-trackW / 2 + inset, 0, 0);
+        // Track art is 126px tall and the pink capsule sits 5px above the frame center.
+        const barLift = trackH * (5 / 126);
+        fill?.setPosition(-trackW / 2 + leftInset, barLift, 0);
 
         const lensH = trackH * 0.92;
         const lensW = lensH * (86 / 103);
@@ -247,7 +250,7 @@ export class LevelComplete extends Component {
 
         const count = progress?.getChildByName('Count') || null;
         this.setSize(count, trackW, trackH);
-        count?.setPosition(0, 0, 0);
+        count?.setPosition(0, barLift, 0);
         this.styleText(this.countLabel, Math.max(22, Math.round(34 * unit)));
 
         const streakNode = this.node.getChildByName('ScoreLabel');

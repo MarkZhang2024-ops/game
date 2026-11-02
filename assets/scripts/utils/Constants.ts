@@ -89,14 +89,23 @@ export const COLORS = {
     maskColor: '#2C3E50',    // dark blue-gray
 };
 
+/**
+ * Extra inset around a candy, in cell pixels.
+ * 方块.png is 179×180 with 4px of transparent margin on each side.
+ * Placed edge to edge, that margin is the cream gap on the 1080 design
+ * (about 8px between candies). A further inset makes the gap wider than the UI.
+ */
+export function cellInset(_cellSize: number): number {
+    return 0;
+}
+
 export const LAYOUT = {
     headerHeight: 110,
     ruleBarHeight: 150,
     statusBarHeight: 110,
     bottomBarHeight: 180,
-    cellGap: 1,
     cellRadiusRatio: 0.22,
-    boardPadding: 24,
+    boardPadding: 8,
     boardRadius: 36,
     regionBorderWidthRatio: 0.04,
     buttonRadius: 52,

@@ -9,6 +9,7 @@ import {
     Color,
     Component,
     EditBox,
+    Font,
     Label,
     Node,
     Sprite,
@@ -18,23 +19,35 @@ import {
 } from 'cc';
 import { GameDataManager } from '../core/GameDataManager';
 import { UserService } from '../data/UserService';
-import { loadSpriteFrame } from './GameArt';
+import { loadByUuid, loadSpriteFrame } from './GameArt';
+import { fillName } from './LeaderboardArt';
 import { PROFILE_AVATARS, profileAvatar } from './ProfileAvatars';
 import { addButton, addLabel, applySprite, stretch, uiNode, whiteFrame } from './UiKit';
 
 const { ccclass } = _decorator;
 
 const FRAME = '074d9746-bcf6-48f5-9d2c-cef9cd0b7f47@f9941';
+const NAME_BAR = 'c69bc959-7959-4a08-b552-0aafa3903345@f9941';
 const NAME_PLATE = '9f1d2d2e-087d-4ed1-a1a2-aac09e2e7741@f9941';
 const EDIT = '2adcebce-8d1b-44ab-a501-90341d27fc81@f9941';
 const SAVE = 'b17377ce-3dc8-4e8a-8a6a-90a0b0515dc6@f9941';
 const CHECK = '7349f859-b195-4adb-81ca-ca691e959824@f9941';
+const ROUNDED_FONT = '8ced58e9-6351-4596-8f44-8fd0d123b0b7';
 
 const PANEL_W = 977;
 const PANEL_H = 1637;
 const PLATE_W = 484;
 const PLATE_H = 138;
-const NAME_INSET = 36;
+const NAME_X_HEIGHT = 29;
+/** Gap between glyphs on the 1080 comp is 5px at a 32px x-height. */
+const NAME_GAP = 5 / 32;
+const AVATAR_W = 249;
+const AVATAR_H = 243;
+/** Cream gap between avatar sprites on the profile comp. Same value for every pair. */
+const AVATAR_GAP_X = 9;
+const AVATAR_GAP_Y = 12;
+const AVATAR_ORIGIN_X = -251.5;
+const AVATAR_ORIGIN_Y = 88.5;
 const NAME_COLOR = new Color(92, 42, 24, 255);
 const NAME_LIMIT = 12;
 
@@ -49,7 +62,9 @@ export class ProfilePopup extends Component {
     private listening = false;
     private panel: Node | null = null;
     private nameAvatar: Sprite | null = null;
+    private nameArt: Node | null = null;
     private nameEdit: EditBox | null = null;
+    private nameEditing = false;
     private editButton: Button | null = null;
     private saveButton: Button | null = null;
     private options: AvatarOption[] = [];
@@ -126,29 +141,40 @@ export class ProfilePopup extends Component {
         frame.type = Sprite.Type.SIMPLE;
         applySprite(frame, FRAME);
 
-        const nameAvatar = uiNode('NameAvatar', 150, 147);
+        const bar = uiNode('NameBar', 808, 191);
+        bar.setParent(this.panel);
+        bar.setPosition(0, 348, 0);
+        const barSprite = bar.addComponent(Sprite);
+        barSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        barSprite.type = Sprite.Type.SIMPLE;
+        applySprite(barSprite, NAME_BAR);
+
+        const nameAvatar = uiNode('NameAvatar', 164, 160);
         nameAvatar.setParent(this.panel);
-        nameAvatar.setPosition(-306, 342, 0);
+        nameAvatar.setPosition(-306, 344, 0);
         this.nameAvatar = nameAvatar.addComponent(Sprite);
         this.nameAvatar.sizeMode = Sprite.SizeMode.CUSTOM;
         this.nameAvatar.type = Sprite.Type.SIMPLE;
 
         const plate = uiNode('NamePlate', PLATE_W, PLATE_H);
         plate.setParent(this.panel);
-        plate.setPosition(34, 342, 0);
+        plate.setPosition(14, 348, 0);
         const plateSprite = plate.addComponent(Sprite);
         plateSprite.sizeMode = Sprite.SizeMode.CUSTOM;
         plateSprite.type = Sprite.Type.SIMPLE;
         applySprite(plateSprite, NAME_PLATE);
-        const fieldW = PLATE_W - NAME_INSET * 2;
-        const field = uiNode('NameField', fieldW, PLATE_H);
+        const field = uiNode('NameField', PLATE_W, PLATE_H);
         field.setParent(plate);
-        const text = addLabel(field, 'Text', '', 44, NAME_COLOR, fieldW, PLATE_H);
-        text.horizontalAlign = Label.HorizontalAlign.LEFT;
+        this.nameArt = uiNode('NameArt', PLATE_W, PLATE_H);
+        this.nameArt.setParent(plate);
+        const text = addLabel(field, 'Text', '', 40, NAME_COLOR, PLATE_W, PLATE_H);
+        text.horizontalAlign = Label.HorizontalAlign.CENTER;
         text.verticalAlign = Label.VerticalAlign.CENTER;
-        const placeholder = addLabel(field, 'Placeholder', 'Name', 44, new Color(160, 112, 80, 180), fieldW, PLATE_H);
-        placeholder.horizontalAlign = Label.HorizontalAlign.LEFT;
+        const placeholder = addLabel(field, 'Placeholder', 'Name', 40, new Color(160, 112, 80, 180), PLATE_W, PLATE_H);
+        placeholder.horizontalAlign = Label.HorizontalAlign.CENTER;
         placeholder.verticalAlign = Label.VerticalAlign.CENTER;
+        this.applyNameFont(text);
+        this.applyNameFont(placeholder);
         this.placeNameLabel(text);
         this.placeNameLabel(placeholder);
         this.nameEdit = field.addComponent(EditBox);
@@ -160,24 +186,22 @@ export class ProfilePopup extends Component {
 
         const edit = uiNode('EditButton', 119, 120);
         edit.setParent(this.panel);
-        edit.setPosition(326, 342, 0);
+        edit.setPosition(325, 348, 0);
         this.editButton = addButton(edit, 0.94);
         const editSprite = edit.addComponent(Sprite);
         editSprite.sizeMode = Sprite.SizeMode.CUSTOM;
         editSprite.type = Sprite.Type.SIMPLE;
         applySprite(editSprite, EDIT);
 
-        const spots = [
-            { x: -252, y: 85 },
-            { x: 0, y: 85 },
-            { x: 252, y: 85 },
-            { x: -252, y: -167 },
-            { x: 0, y: -167 },
-            { x: 252, y: -167 },
-        ];
+        const pitchX = AVATAR_W + AVATAR_GAP_X;
+        const pitchY = AVATAR_H + AVATAR_GAP_Y;
+        const spots = [0, 1, 2, 3, 4, 5].map((index) => ({
+            x: AVATAR_ORIGIN_X + (index % 3) * pitchX,
+            y: AVATAR_ORIGIN_Y - Math.floor(index / 3) * pitchY,
+        }));
         PROFILE_AVATARS.forEach((avatar, index) => {
             const spot = spots[index];
-            const option = uiNode(`Avatar_${avatar.id}`, 249, 243);
+            const option = uiNode(`Avatar_${avatar.id}`, AVATAR_W, AVATAR_H);
             option.setParent(this.panel);
             option.setPosition(spot.x, spot.y, 0);
             const button = addButton(option, 0.96);
@@ -187,7 +211,7 @@ export class ProfilePopup extends Component {
             applySprite(sprite, avatar.portrait);
             const check = uiNode('Check', 98, 98);
             check.setParent(option);
-            check.setPosition(88, -78, 0);
+            check.setPosition(77, -66, 0);
             const checkSprite = check.addComponent(Sprite);
             checkSprite.sizeMode = Sprite.SizeMode.CUSTOM;
             checkSprite.type = Sprite.Type.SIMPLE;
@@ -199,7 +223,7 @@ export class ProfilePopup extends Component {
 
         const save = uiNode('SaveButton', 526, 220);
         save.setParent(this.panel);
-        save.setPosition(18, -612, 0);
+        save.setPosition(14, -618, 0);
         this.saveButton = addButton(save, 0.96);
         const saveSprite = save.addComponent(Sprite);
         saveSprite.sizeMode = Sprite.SizeMode.CUSTOM;
@@ -212,6 +236,8 @@ export class ProfilePopup extends Component {
         this.listening = true;
         this.editButton?.node.on(Button.EventType.CLICK, this.onEdit, this);
         this.saveButton?.node.on(Button.EventType.CLICK, this.onSave, this);
+        this.nameEdit?.node.on(EditBox.EventType.EDITING_DID_BEGAN, this.onNameBegan, this);
+        this.nameEdit?.node.on(EditBox.EventType.EDITING_DID_ENDED, this.onNameEnded, this);
     }
 
     private unbind(): void {
@@ -219,6 +245,8 @@ export class ProfilePopup extends Component {
         this.listening = false;
         this.editButton?.node.off(Button.EventType.CLICK, this.onEdit, this);
         this.saveButton?.node.off(Button.EventType.CLICK, this.onSave, this);
+        this.nameEdit?.node.off(EditBox.EventType.EDITING_DID_BEGAN, this.onNameBegan, this);
+        this.nameEdit?.node.off(EditBox.EventType.EDITING_DID_ENDED, this.onNameEnded, this);
     }
 
     private showName(name: string): void {
@@ -229,31 +257,70 @@ export class ProfilePopup extends Component {
         const placeholder = edit.placeholderLabel;
         if (text) {
             text.string = name;
-            text.node.active = name.length > 0;
             this.placeNameLabel(text);
         }
-        if (placeholder) {
-            placeholder.node.active = name.length === 0;
-            this.placeNameLabel(placeholder);
-        }
+        if (placeholder) this.placeNameLabel(placeholder);
+        this.syncNameVisual();
     }
 
-    /** EditBox pins the label to the field's top-left. The field itself is already inset from the plate. */
+    /** Sprite letters while idle. The EditBox label shows only while typing, or when the name has no letter art. */
+    private syncNameVisual(): void {
+        const edit = this.nameEdit;
+        const name = edit?.string ?? '';
+        const art = !this.nameEditing
+            && !!this.nameArt
+            && fillName(this.nameArt, name, NAME_X_HEIGHT, PLATE_W - 48, NAME_GAP);
+        if (this.nameArt) {
+            this.nameArt.active = art;
+            const width = this.nameArt.getComponent(UITransform)?.width ?? 0;
+            this.nameArt.setPosition(-width / 2, 5, 0);
+        }
+        const text = edit?.textLabel;
+        const placeholder = edit?.placeholderLabel;
+        if (text) text.node.active = !art && name.length > 0;
+        if (placeholder) placeholder.node.active = !art && name.length === 0;
+    }
+
+    private applyNameFont(label: Label): void {
+        label.isBold = false;
+        label.fontSize = 40;
+        label.lineHeight = 40;
+        loadByUuid<Font>(ROUNDED_FONT, (font) => {
+            if (!font || !label.isValid) return;
+            label.useSystemFont = false;
+            label.font = font;
+            label.isBold = false;
+        });
+    }
+
+    private onNameBegan(): void {
+        this.nameEditing = true;
+        this.syncNameVisual();
+    }
+
+    private onNameEnded(): void {
+        this.nameEditing = false;
+        this.syncNameVisual();
+    }
+
+    /** EditBox pins the label to the field's top-left. The text itself stays centered in the plate. */
     private placeNameLabel(label: Label | null): void {
         if (!label) return;
         const node = label.node;
         const parent = node.parent?.getComponent(UITransform);
-        const width = parent?.width || PLATE_W - NAME_INSET * 2;
+        const width = parent?.width || PLATE_W;
         const height = parent?.height || PLATE_H;
         const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
         transform.setAnchorPoint(0, 1);
         transform.setContentSize(width, height);
         node.setPosition(-width / 2, height / 2, 0);
-        label.horizontalAlign = Label.HorizontalAlign.LEFT;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
     }
 
     private onEdit(): void {
+        this.nameEditing = true;
+        this.syncNameVisual();
         this.nameEdit?.focus();
     }
 

@@ -5,13 +5,22 @@
 import { _decorator, Color, Component, Label, Node, Sprite, UITransform } from 'cc';
 import { LeaderboardEntry } from '../data/LeaderboardData';
 import { avatarFrame } from './AvatarConfig';
-import { fillDigits, layoutLevelColumn, rowFrame, showFrame, starFrame } from './LeaderboardArt';
+import {
+    fillDigits,
+    fillName,
+    layoutLevelColumn,
+    LEVEL_SMALL,
+    RANK_DIGITS,
+    rowFrame,
+    showFrame,
+    starFrame,
+} from './LeaderboardArt';
 import { profileAvatar } from './ProfileAvatars';
 import { addLabel, uiNode } from './UiKit';
 
 const { ccclass } = _decorator;
 
-const NAME_COLOR = new Color(112, 54, 28, 255);
+const NAME_COLOR = new Color(86, 22, 18, 255);
 
 @ccclass('LeaderboardItem')
 export class LeaderboardItem extends Component {
@@ -23,8 +32,9 @@ export class LeaderboardItem extends Component {
     private rankIcon: Sprite | null = null;
     private rankDigits: Node | null = null;
     private avatar: Sprite | null = null;
+    private nameArt: Node | null = null;
     private nameLabel: Label | null = null;
-    private levelCaption: Label | null = null;
+    private levelWord: Sprite | null = null;
     private levelDigits: Node | null = null;
 
     public setItemSize(width: number, height: number): void {
@@ -70,8 +80,8 @@ export class LeaderboardItem extends Component {
         avatar.setParent(this.node);
         this.avatar = avatar.addComponent(Sprite);
 
-        this.levelDigits = uiNode('LevelDigits', 80, 40);
-        this.levelDigits.setParent(this.node);
+        this.nameArt = uiNode('PlayerNameArt', 420, 70);
+        this.nameArt.setParent(this.node);
 
         this.nameLabel = addLabel(this.node, 'PlayerName', '', 34, NAME_COLOR, 420, 70);
         this.nameLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
@@ -79,12 +89,12 @@ export class LeaderboardItem extends Component {
         this.nameLabel.cacheMode = Label.CacheMode.BITMAP;
         this.nameLabel.node.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
 
-        this.levelCaption = addLabel(this.node, 'LevelCaption', 'Level', 22, NAME_COLOR, 140, 32);
-        this.levelCaption.horizontalAlign = Label.HorizontalAlign.CENTER;
-        this.levelCaption.verticalAlign = Label.VerticalAlign.CENTER;
-        this.levelCaption.enableWrapText = false;
-        this.levelCaption.cacheMode = Label.CacheMode.BITMAP;
-        this.levelCaption.node.getComponent(UITransform)?.setAnchorPoint(0.5, 0.5);
+        const word = uiNode('LevelWord', LEVEL_SMALL.width, LEVEL_SMALL.height);
+        word.setParent(this.node);
+        this.levelWord = word.addComponent(Sprite);
+
+        this.levelDigits = uiNode('LevelDigits', 80, 40);
+        this.levelDigits.setParent(this.node);
     }
 
     private layout(): void {
@@ -104,22 +114,46 @@ export class LeaderboardItem extends Component {
         this.avatar?.node.setPosition(left + height * 1.42, 0, 0);
 
         const nameX = left + height * 1.95;
-        const nameW = Math.max(80, width * 0.4);
-        this.nameLabel?.node.getComponent(UITransform)?.setContentSize(nameW, height * 0.46);
+        this.nameArt?.setPosition(nameX, 0, 0);
+        this.nameLabel?.node.getComponent(UITransform)?.setContentSize(this.nameWidth(), height * 0.46);
         this.nameLabel?.node.setPosition(nameX, 0, 0);
         if (this.nameLabel) this.nameLabel.fontSize = Math.max(18, Math.round(height * 0.22));
+    }
+
+    private nameWidth(): number {
+        return Math.max(80, this.itemWidth * 0.46);
     }
 
     private paint(): void {
         const entry = this.entry;
         if (!entry || !this.background || !this.rankIcon || !this.avatar || !this.rankDigits || !this.levelDigits) return;
+        const height = this.itemHeight;
         showFrame(this.background, rowFrame(entry.rank));
         const star = starFrame(entry.rank);
         this.rankIcon.enabled = !!star;
         showFrame(this.rankIcon, star);
-        fillDigits(this.rankDigits, entry.rank, this.itemHeight * 0.28);
+        fillDigits(this.rankDigits, entry.rank, height * 0.28, RANK_DIGITS);
         showFrame(this.avatar, avatarFrame(entry.avatarId) ?? profileAvatar(entry.avatarId).portrait);
-        if (this.nameLabel) this.nameLabel.string = entry.playerName;
-        if (this.levelCaption) layoutLevelColumn(this.levelCaption, this.levelDigits, this.itemWidth, this.itemHeight, entry.level);
+
+        const art = !!this.nameArt && fillName(this.nameArt, entry.playerName, height * 0.2, this.nameWidth());
+        if (this.nameArt) this.nameArt.active = art;
+        if (this.nameLabel) {
+            this.nameLabel.node.active = !art;
+            this.nameLabel.string = art ? '' : entry.playerName;
+        }
+
+        if (this.levelWord) {
+            layoutLevelColumn(
+                this.levelWord,
+                this.levelDigits,
+                this.itemWidth / 2 - height * 0.9,
+                entry.level,
+                LEVEL_SMALL,
+                height * 0.27,
+                height * 0.19,
+                RANK_DIGITS,
+                height * 0.02,
+            );
+        }
     }
 }

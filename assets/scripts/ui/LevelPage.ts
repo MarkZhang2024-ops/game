@@ -10,6 +10,7 @@ import {
     Button,
     Color,
     Component,
+    Font,
     Label,
     Node,
     Sprite,
@@ -22,7 +23,8 @@ import { GameManager } from '../core/GameManager';
 import { LevelManager } from '../core/LevelManager';
 import { AchievementDataSource } from '../data/AchievementData';
 import { BottomNavigation } from './BottomNavigation';
-import { loadSpriteFrame } from './GameArt';
+import { loadByUuid, loadSpriteFrame } from './GameArt';
+import { fillDigits, fillName, GlyphSet, showFrame } from './LeaderboardArt';
 import { profileAvatar } from './ProfileAvatars';
 import { ProfilePopup } from './ProfilePopup';
 import { addButton, addLabel, applySprite, stretch, uiNode } from './UiKit';
@@ -39,6 +41,37 @@ const SETTINGS = 'fb71f1eb-494b-4ba0-b1ef-c7029436d106@f9941';
 const LEVEL_BUTTON = '8aaa2b72-a04b-442a-884b-c8bf0133d28b@f9941';
 const UNDERLINE_NUMBER = '51ea4e4f-721f-4ee7-96fd-ba5749d5c754@f9941';
 const UNDERLINE_SCENE = '38c3d952-be75-4c45-81b6-b57fb8fedd2b@f9941';
+const NUMBER_CAPTION = '56a41899-da88-4898-b9af-59f24dd4e4e5@f9941';
+const SCENE_CAPTION = 'c013d154-0846-47ff-9183-adcf0159d168@f9941';
+
+/** 关数数字: white "Level" word and digits on the green button. */
+const BUTTON_WORD = { frame: 'c06874cd-9dfb-4b16-91a4-5571292acf27@f9941', width: 243, height: 86 };
+const BUTTON_DIGITS: GlyphSet = {
+    frames: [
+        '4f5ccfd2-2bd6-4876-8df5-3b56f2bf0bf6@f9941',
+        'aff2f538-6eaa-42bb-ae49-7db7937ba536@f9941',
+        '0d97a80d-a39a-4823-ab67-df890489c2fd@f9941',
+        'fa8073c0-e93a-46a3-8960-e5c70273cb70@f9941',
+        'fb28447d-3790-4086-9b37-cb69df0dcad1@f9941',
+        '0b2d21de-7107-4d20-815b-bf208fef2089@f9941',
+        '16107c7a-cd0c-40ce-87ba-cea7fb80a631@f9941',
+        'a075c0f8-fb50-4287-a073-fd6503911280@f9941',
+        '35e909d8-cce3-4bd8-a2c1-92d4b1ce27e9@f9941',
+        'a0761439-53b9-4401-b89b-81c9c6b89ff0@f9941',
+    ],
+    sizes: [
+        [55, 77], [49, 73], [55, 75], [54, 77], [58, 73],
+        [54, 75], [54, 77], [54, 73], [54, 77], [55, 77],
+    ],
+};
+const BUTTON_DIGIT_H = 77;
+const BUTTON_WORD_GAP = 22;
+/** Cream-pill name on the level comp: x-height 30, about 7px between letters. */
+const NAME_X_HEIGHT = 30;
+const NAME_GAP = 0.23;
+const NAME_MAX_W = 250;
+const NAME_CENTER_X = 37;
+const NAME_CENTER_Y = 1;
 
 const NAV_BAR = 'cab2fd53-8d8d-41d0-b006-e33c5ad2b132@f9941';
 const NAV_CROWN = 'ae18f3b1-65cb-4c4d-aa71-7ae2fcf1f938@f9941';
@@ -48,6 +81,9 @@ const NAV_CALENDAR = 'e8b5d506-858f-4e60-a873-f1a1dfc945c1@f9941';
 const NAME_COLOR = new Color(72, 19, 15, 255);
 const CAPTION_COLOR = new Color(103, 42, 23, 255);
 const VALUE_COLOR = new Color(246, 39, 134, 255);
+/** ResourceHanRoundedCN-Bold. Size 42 matches the comp: "01" is 45×33, scene names ~306px. */
+const ROUNDED_FONT = '8ced58e9-6351-4596-8f44-8fd0d123b0b7';
+const VALUE_FONT = 42;
 const BUTTON_TEXT = new Color(255, 255, 255, 255);
 const BUTTON_SHADOW = new Color(18, 120, 42, 170);
 
@@ -107,6 +143,9 @@ export class LevelPage extends Component {
     private previewToken = 0;
     private shownCard = '';
     private layingOut = false;
+    private nameArt: Node | null = null;
+    private buttonArt: Node | null = null;
+    private buttonDigits: Node | null = null;
 
     protected onLoad(): void {
         this.ensureView();
@@ -177,7 +216,9 @@ export class LevelPage extends Component {
         this.playerNameLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this.playerNameLabel.lineHeight = 34;
         // Cream center is above the plate node center; the bear covers the left of the pill.
-        this.playerNameLabel.node.setPosition(47, 8, 0);
+        this.playerNameLabel.node.setPosition(NAME_CENTER_X, NAME_CENTER_Y, 0);
+        this.nameArt = uiNode('PlayerNameArt', NAME_MAX_W, 64);
+        this.nameArt.setParent(plate);
 
         const avatar = uiNode('CharacterIcon', 224, 219);
         avatar.setParent(top);
@@ -214,14 +255,22 @@ export class LevelPage extends Component {
 
         this.numberCaption = addLabel(card, 'NumberCaption', 'Number:', 32, CAPTION_COLOR, 200, 40);
         this.numberCaption.horizontalAlign = Label.HorizontalAlign.LEFT;
-        this.numberValue = addLabel(card, 'NumberValue', '01', 34, VALUE_COLOR, 140, 44);
-        this.numberValue.horizontalAlign = Label.HorizontalAlign.LEFT;
+        this.numberCaption.node.active = false;
+        const numberArt = uiNode('NumberCaptionArt', 184, 36);
+        numberArt.setParent(card);
+        applySprite(numberArt.addComponent(Sprite), NUMBER_CAPTION);
+        this.numberValue = addLabel(card, 'NumberValue', '01', VALUE_FONT, VALUE_COLOR, 220, VALUE_FONT);
+        this.styleValue(this.numberValue, Label.Overflow.SHRINK);
 
         this.sceneCaption = addLabel(card, 'SceneCaption', 'Scene:', 32, CAPTION_COLOR, 160, 40);
         this.sceneCaption.horizontalAlign = Label.HorizontalAlign.LEFT;
-        this.sceneName = addLabel(card, 'SceneName', '', 34, VALUE_COLOR, 420, 44);
-        this.sceneName.horizontalAlign = Label.HorizontalAlign.LEFT;
-        this.sceneName.overflow = Label.Overflow.SHRINK;
+        this.sceneCaption.node.active = false;
+        const sceneArt = uiNode('SceneCaptionArt', 140, 34);
+        sceneArt.setParent(card);
+        applySprite(sceneArt.addComponent(Sprite), SCENE_CAPTION);
+        this.sceneName = addLabel(card, 'SceneName', '', VALUE_FONT, VALUE_COLOR, 400, VALUE_FONT);
+        this.styleValue(this.sceneName, Label.Overflow.SHRINK);
+        this.applyValueFont();
 
         const button = uiNode('LevelButton', 630, 262);
         button.setParent(this.node);
@@ -243,6 +292,15 @@ export class LevelPage extends Component {
         this.levelButtonLabel.shadowOffset = new Vec2(0, -4);
         this.levelButtonLabel.shadowBlur = 2;
         this.levelButtonLabel.node.setPosition(0, 0, 0);
+        this.levelButtonLabel.node.active = false;
+
+        this.buttonArt = uiNode('LevelArt', 630, 120);
+        this.buttonArt.setParent(button);
+        const word = uiNode('LevelWord', BUTTON_WORD.width, BUTTON_WORD.height);
+        word.setParent(this.buttonArt);
+        showFrame(word.addComponent(Sprite), BUTTON_WORD.frame);
+        this.buttonDigits = uiNode('LevelDigits', 60, BUTTON_DIGIT_H);
+        this.buttonDigits.setParent(this.buttonArt);
 
         this.navSlot = uiNode('BottomNavigation', DESIGN_W, 211);
         this.navSlot.setParent(this.node);
@@ -264,12 +322,37 @@ export class LevelPage extends Component {
         const profile = GameDataManager.getProfile();
         const level = LevelManager.getCurrentLevel();
         const scene = AchievementDataSource.sceneForLevel(level);
-        if (this.playerNameLabel) this.playerNameLabel.string = profile.playerName;
+        this.paintName(profile.playerName);
         if (this.avatarSprite) applySprite(this.avatarSprite, profileAvatar(profile.avatarId).header);
         if (this.numberValue) this.numberValue.string = `${level}`.padStart(2, '0');
-        if (this.sceneName) this.sceneName.string = scene.title;
+        if (this.sceneName) this.sceneName.string = scene.title.toLowerCase();
         if (this.levelButtonLabel) this.levelButtonLabel.string = `Level ${level}`;
+        this.paintButtonLevel(level);
         this.showCard(scene.image);
+    }
+
+    /** Sprite letters when the name is a–z or digits; otherwise the Label. */
+    private paintName(name: string): void {
+        const art = !!this.nameArt && fillName(this.nameArt, name, NAME_X_HEIGHT, NAME_MAX_W, NAME_GAP);
+        if (this.nameArt) {
+            this.nameArt.active = art;
+            const width = this.nameArt.getComponent(UITransform)?.width ?? 0;
+            this.nameArt.setPosition(NAME_CENTER_X - width / 2, NAME_CENTER_Y, 0);
+        }
+        if (this.playerNameLabel) {
+            this.playerNameLabel.node.active = !art;
+            this.playerNameLabel.string = art ? '' : name;
+        }
+    }
+
+    /** "Level" word plus digit sprites, centered as one group on the button. */
+    private paintButtonLevel(level: number): void {
+        if (!this.buttonArt || !this.buttonDigits) return;
+        const digitsW = fillDigits(this.buttonDigits, level, BUTTON_DIGIT_H, BUTTON_DIGITS);
+        const total = BUTTON_WORD.width + BUTTON_WORD_GAP + digitsW;
+        const left = -total / 2;
+        this.buttonArt.getChildByName('LevelWord')?.setPosition(left + BUTTON_WORD.width / 2, 0, 0);
+        this.buttonDigits.setPosition(left + BUTTON_WORD.width + BUTTON_WORD_GAP + digitsW / 2, -2, 0);
     }
 
     public relayout = (): void => {
@@ -289,11 +372,13 @@ export class LevelPage extends Component {
         this.place(card, CARD_RECT, pageW, pageH);
         this.placeIn(card?.getChildByName('CardBackground') ?? null, CARD_RECT, CARD_RECT);
         this.placeIn(this.numberCaption?.node ?? null, { x: 243, y: 800, w: 200, h: 40 }, CARD_RECT);
-        this.placeIn(this.numberValue?.node ?? null, { x: 450, y: 798, w: 140, h: 44 }, CARD_RECT);
+        this.placeIn(card?.getChildByName('NumberCaptionArt') ?? null, { x: 244, y: 797, w: 184, h: 36 }, CARD_RECT);
+        this.placeIn(this.numberValue?.node ?? null, { x: 462, y: 792, w: 220, h: VALUE_FONT }, CARD_RECT);
         this.placeIn(this.sceneCaption?.node ?? null, { x: 242, y: 852, w: 160, h: 40 }, CARD_RECT);
-        this.placeIn(this.sceneName?.node ?? null, { x: 410, y: 850, w: 400, h: 44 }, CARD_RECT);
-        this.placeIn(card?.getChildByName('NumberUnderline') ?? null, { x: 438, y: 836, w: 376, h: 3 }, CARD_RECT);
-        this.placeIn(card?.getChildByName('SceneUnderline') ?? null, { x: 399, y: 884, w: 415, h: 3 }, CARD_RECT);
+        this.placeIn(card?.getChildByName('SceneCaptionArt') ?? null, { x: 243, y: 847, w: 140, h: 34 }, CARD_RECT);
+        this.placeIn(this.sceneName?.node ?? null, { x: 421, y: 843, w: 400, h: VALUE_FONT }, CARD_RECT);
+        this.placeIn(card?.getChildByName('NumberUnderline') ?? null, { x: 438, y: 837, w: 376, h: 3 }, CARD_RECT);
+        this.placeIn(card?.getChildByName('SceneUnderline') ?? null, { x: 399, y: 885, w: 415, h: 3 }, CARD_RECT);
 
         const barHeight = 211 * (pageW / DESIGN_W);
         const barTop = pageH - barHeight;
@@ -334,6 +419,7 @@ export class LevelPage extends Component {
         label.node.setPosition(0, 0, 0);
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
+        this.buttonArt?.setPosition(0, 6 * (height / 262), 0);
     }
 
     private layoutNav(pageW: number, pageH: number, barHeight: number): void {
@@ -366,6 +452,30 @@ export class LevelPage extends Component {
             sprite.sizeMode = Sprite.SizeMode.CUSTOM;
             sprite.type = Sprite.Type.SIMPLE;
         }
+    }
+
+    /** Pink values use the rounded bold face at the comp size, without a faux bold. */
+    private styleValue(label: Label, overflow: Label.Overflow): void {
+        label.fontSize = VALUE_FONT;
+        label.lineHeight = VALUE_FONT;
+        label.isBold = false;
+        label.horizontalAlign = Label.HorizontalAlign.LEFT;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = overflow;
+    }
+
+    private applyValueFont(): void {
+        loadByUuid<Font>(ROUNDED_FONT, (font) => {
+            if (!font) return;
+            for (const label of [this.numberValue, this.sceneName]) {
+                if (!label?.isValid) continue;
+                label.useSystemFont = false;
+                label.font = font;
+                label.isBold = false;
+                label.fontSize = VALUE_FONT;
+                label.lineHeight = VALUE_FONT;
+            }
+        });
     }
 
     private showCard(uuid: string): void {

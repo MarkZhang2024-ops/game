@@ -63,11 +63,8 @@ export class AchievementCard extends Component {
         this.ensure();
         const value = Math.max(0, Math.min(1, progress));
         if (this.fillSprite) {
-            this.fillSprite.type = Sprite.Type.FILLED;
-            this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
-            this.fillSprite.fillStart = 0;
-            this.fillSprite.fillRange = value;
             this.fillSprite.node.active = value > 0;
+            this.applyFill(value);
         }
         if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
@@ -109,18 +106,11 @@ export class AchievementCard extends Component {
         fill.setParent(this.progressRoot);
         this.fillSprite = fill.addComponent(Sprite);
         this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        this.fillSprite.type = Sprite.Type.FILLED;
-        this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
-        this.fillSprite.fillStart = 0;
-        this.fillSprite.fillRange = 0;
         loadSpriteFrame(BAR_FILL, (frame) => {
             if (!this.fillSprite?.isValid || !frame) return;
             this.fillSprite.spriteFrame = frame;
             this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
-            this.fillSprite.type = Sprite.Type.FILLED;
-            this.fillSprite.fillType = Sprite.FillType.HORIZONTAL;
-            this.fillSprite.fillStart = 0;
-            this.fillSprite.fillRange = this.data ? Math.max(0, Math.min(1, this.data.progress)) : 0;
+            this.applyFill(this.data ? Math.max(0, Math.min(1, this.data.progress)) : 0);
         });
 
         this.countRoot = uiNode('Count', 200, 40);
@@ -140,20 +130,26 @@ export class AchievementCard extends Component {
         title?.getComponent(UITransform)?.setContentSize(width * 0.7, 88 * (height / 839));
         title?.setPosition(0, height / 2 - 78 * (height / 839), 0);
 
-        const barW = 372 * (width / 884);
-        const barH = 70 * (height / 839);
+        // Track art is 425×120 on the 896×876 card. Keep that fraction when the card scales.
+        const barW = width * (425 / 896);
+        const barH = height * (120 / 876);
         if (!this.progressRoot) return;
         this.progressRoot.getComponent(UITransform)?.setContentSize(barW, barH);
-        this.progressRoot.setPosition(0, -height * 0.325, 0);
+        // Green center stays at 0.310 down the card. The capsule sits 2px above the frame.
+        const barLift = barH * (2 / 120);
+        this.progressRoot.setPosition(0, -height * 0.310 - barLift, 0);
         const track = this.progressRoot.getChildByName('Track');
         track?.getComponent(UITransform)?.setContentSize(barW, barH);
         track?.setPosition(0, 0, 0);
         const fill = this.fillSprite?.node;
         const innerW = barW * (374 / 425);
         const innerH = barH * (70 / 120);
-        fill?.getComponent(UITransform)?.setContentSize(innerW, innerH);
-        fill?.setPosition(0, 0, 0);
-        this.countRoot?.setPosition(0, 0, 0);
+        const fillUt = fill?.getComponent(UITransform);
+        fillUt?.setContentSize(innerW, innerH);
+        fillUt?.setAnchorPoint(0, 0.5);
+        // Green starts 26px in from the left of the 425px frame.
+        fill?.setPosition(-barW / 2 + barW * (26 / 425), barLift, 0);
+        this.countRoot?.setPosition(0, barLift, 0);
         if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
 
@@ -164,6 +160,18 @@ export class AchievementCard extends Component {
         if (this.progressRoot) this.progressRoot.active = this.data.unlocked;
         this.setTierProgress(this.data.progress);
         this.loadImage(this.data.image);
+    }
+
+    /** FILLED reads the frame size, so the fill is only set once the frame has loaded. */
+    private applyFill(value: number): void {
+        const sprite = this.fillSprite;
+        if (!sprite || !sprite.spriteFrame) return;
+        if (sprite.type !== Sprite.Type.FILLED) {
+            sprite.type = Sprite.Type.FILLED;
+            sprite.fillType = Sprite.FillType.HORIZONTAL;
+            sprite.fillStart = 0;
+        }
+        sprite.fillRange = value;
     }
 
     private paintCount(completed: number, total: number): void {

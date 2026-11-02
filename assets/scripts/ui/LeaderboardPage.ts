@@ -26,15 +26,19 @@ import { profileAvatar } from './ProfileAvatars';
 import { BottomNavigation } from './BottomNavigation';
 import { LeaderboardItem } from './LeaderboardItem';
 import {
+    BIG_DIGITS,
     fillDigits,
+    fillName,
     layoutLevelColumn,
     LB_BACKGROUND,
     LB_DECORATION,
     LB_TITLE,
     LB_YOUR_RANK_CARD,
     LB_YOUR_RANK_RIBBON,
+    LEVEL_BIG,
+    RANK_DIGITS,
     showFrame,
-    starFrame,
+    currentStarFrame,
 } from './LeaderboardArt';
 import { addLabel, applySprite, setLayerTree, stretch, uiNode } from './UiKit';
 
@@ -92,8 +96,10 @@ export class LeaderboardPage extends Component {
     private currentRankDigits: Node | null = null;
     private currentAvatar: Sprite | null = null;
     private currentName: Label | null = null;
-    private currentLevelCaption: Label | null = null;
+    private currentNameArt: Node | null = null;
+    private currentLevelWord: Sprite | null = null;
     private currentLevelDigits: Node | null = null;
+    private currentPlayerName = '';
     private itemWidth = ITEM_W;
     private itemHeight = ITEM_H;
     private itemGap = ITEM_GAP;
@@ -259,14 +265,16 @@ export class LeaderboardPage extends Component {
         ribbonSprite.type = Sprite.Type.SIMPLE;
         applySprite(ribbonSprite, LB_YOUR_RANK_RIBBON);
 
+        this.currentNameArt = uiNode('PlayerNameArt', 360, 64);
+        this.currentNameArt.setParent(this.currentCard);
+
         this.currentName = addLabel(this.currentCard, 'PlayerName', '', 36, NAME_COLOR, 360, 64);
         this.currentName.horizontalAlign = Label.HorizontalAlign.LEFT;
         this.currentName.node.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
 
-        this.currentLevelCaption = addLabel(this.currentCard, 'LevelCaption', 'Level', 22, NAME_COLOR, 160, 36);
-        this.currentLevelCaption.horizontalAlign = Label.HorizontalAlign.CENTER;
-        this.currentLevelCaption.verticalAlign = Label.VerticalAlign.CENTER;
-        this.currentLevelCaption.node.getComponent(UITransform)?.setAnchorPoint(0.5, 0.5);
+        const word = uiNode('LevelWord', LEVEL_BIG.width, LEVEL_BIG.height);
+        word.setParent(this.currentCard);
+        this.currentLevelWord = word.addComponent(Sprite);
 
         this.currentLevelDigits = uiNode('LevelDigits', 120, 48);
         this.currentLevelDigits.setParent(this.currentCard);
@@ -318,12 +326,12 @@ export class LeaderboardPage extends Component {
         this.currentStar.node.active = ranked;
         this.currentRankDigits.active = ranked;
         if (!entry) return;
-        const star = starFrame(entry.rank);
-        this.currentStar.enabled = !!star;
+        const star = currentStarFrame(entry.rank);
+        this.currentStar.enabled = true;
         showFrame(this.currentStar, star);
         const height = this.currentCard.getComponent(UITransform)?.height ?? RANK_CARD_H;
         const starSize = height * 0.46;
-        fillDigits(this.currentRankDigits, entry.rank, starSize * 0.36);
+        fillDigits(this.currentRankDigits, entry.rank, starSize * 0.36, RANK_DIGITS);
         this.currentRankDigits.setPosition(0, -starSize * 0.06, 0);
         this.layoutCurrent();
     }
@@ -332,10 +340,10 @@ export class LeaderboardPage extends Component {
     private applyLocalPlayer(): void {
         if (!this.currentCard || !this.currentAvatar || !this.currentLevelDigits) return;
         const profile = GameDataManager.getProfile();
-        if (this.currentName) this.currentName.string = profile.playerName;
+        this.currentPlayerName = profile.playerName;
         this.currentAvatar.node.active = true;
         showFrame(this.currentAvatar, avatarFrame(profile.avatarId) ?? profileAvatar(profile.avatarId).portrait);
-        if (this.currentLevelCaption) this.currentLevelCaption.node.active = true;
+        if (this.currentLevelWord) this.currentLevelWord.node.active = true;
         this.currentLevelDigits.active = true;
         this.layoutCurrent();
     }
@@ -408,22 +416,32 @@ export class LeaderboardPage extends Component {
         const ribbon = this.currentCard.getChildByName('YourRank');
         ribbon?.getComponent(UITransform)?.setContentSize(height * 0.7, height * 0.22);
         ribbon?.setPosition(left + height * 1.12, -height * 0.22, 0);
-        this.currentName?.node.getComponent(UITransform)?.setContentSize(width * 0.36, height * 0.28);
-        this.currentName?.node.setPosition(left + height * 1.55, 0, 0);
+        const nameX = left + height * 1.55;
+        const nameW = width * 0.36;
+        this.currentName?.node.getComponent(UITransform)?.setContentSize(nameW, height * 0.28);
+        this.currentName?.node.setPosition(nameX, 0, 0);
         if (this.currentName) {
             this.currentName.fontSize = Math.max(18, Math.round(height * 0.13));
             this.currentName.verticalAlign = Label.VerticalAlign.CENTER;
         }
-        if (this.currentLevelCaption && this.currentLevelDigits) {
+        this.currentNameArt?.setPosition(nameX, 0, 0);
+        const art = !!this.currentNameArt && fillName(this.currentNameArt, this.currentPlayerName, height * 0.11, nameW);
+        if (this.currentNameArt) this.currentNameArt.active = art;
+        if (this.currentName) {
+            this.currentName.node.active = !art;
+            this.currentName.string = art ? '' : this.currentPlayerName;
+        }
+        if (this.currentLevelWord && this.currentLevelDigits) {
             layoutLevelColumn(
-                this.currentLevelCaption,
+                this.currentLevelWord,
                 this.currentLevelDigits,
-                width,
-                height,
+                width / 2 - Math.round(width * 0.134),
                 LevelManager.getCurrentLevel(),
-                0.15,
-                0.95,
-                Math.round(width * 0.134),
+                LEVEL_BIG,
+                height * 0.19,
+                height * 0.18,
+                BIG_DIGITS,
+                height * 0.02,
             );
         }
     }

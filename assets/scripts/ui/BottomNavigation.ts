@@ -28,6 +28,20 @@ const { ccclass, property } = _decorator;
 
 export type NavTab = 'achievement' | 'home' | 'leaderboard';
 
+/** Selected icons include the glow, so they are larger than the idle icons. File names are swapped like the idle set. */
+const SELECTED_CROWN = '60060759-9777-4431-a4e1-29ad6474e295@f9941';
+const SELECTED_HOME = 'e0532eba-385e-4893-bced-9c2f5b43b86c@f9941';
+const SELECTED_CALENDAR = 'd7240dec-3a43-4498-a19e-c9d5ab43d415@f9941';
+
+interface TabArt {
+    idle: string;
+    idleW: number;
+    idleH: number;
+    selected: string;
+    selectedW: number;
+    selectedH: number;
+}
+
 @ccclass('BottomNavigation')
 export class BottomNavigation extends Component {
     @property(Button)
@@ -57,6 +71,7 @@ export class BottomNavigation extends Component {
     private artMode = false;
     private artReady = false;
     private art: LevelNavArt | null = null;
+    private readonly artUuids = new Map<Node, string>();
 
     protected onLoad(): void {
         this.ensureButtons();
@@ -210,11 +225,19 @@ export class BottomNavigation extends Component {
         if (this.artReady || !this.art || !this.barNode) return;
         this.artReady = true;
         this.paintArt(this.barNode, this.art.bar, 1080, 211);
-        this.paintArt(this.achievementIcon, this.art.crown, 105, 103);
-        this.paintArt(this.homeIcon, this.art.home, 100, 104);
-        this.paintArt(this.leaderboardIcon, this.art.calendar, 96, 102);
         // Crown (排行榜) stays on the left and opens the leaderboard.
         // Clipboard (成就) stays on the right and opens achievements.
+    }
+
+    private tabArt(tab: NavTab): TabArt | null {
+        if (!this.art) return null;
+        if (tab === 'leaderboard') {
+            return { idle: this.art.crown, idleW: 105, idleH: 103, selected: SELECTED_CROWN, selectedW: 159, selectedH: 187 };
+        }
+        if (tab === 'home') {
+            return { idle: this.art.home, idleW: 100, idleH: 104, selected: SELECTED_HOME, selectedW: 181, selectedH: 192 };
+        }
+        return { idle: this.art.calendar, idleW: 96, idleH: 102, selected: SELECTED_CALENDAR, selectedW: 152, selectedH: 172 };
     }
 
     private paintArt(host: Node | null, uuid: string, width: number, height: number): void {
@@ -237,10 +260,12 @@ export class BottomNavigation extends Component {
         const sprite = art.getComponent(Sprite) ?? art.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         sprite.type = Sprite.Type.SIMPLE;
+        if (this.artUuids.get(art) === uuid) return;
+        this.artUuids.set(art, uuid);
         applySprite(sprite, uuid);
     }
 
-    /** Centers measured on the 1080×211 bar in design/level.png. */
+    /** Icon centers are on the vertical center of the 1080×211 bar. */
     private layoutArt(): void {
         if (!this.art) return;
         this.ensureArt();
@@ -261,22 +286,27 @@ export class BottomNavigation extends Component {
                 graphics.enabled = false;
             }
         }
-        this.placeArtButton(this.achievementButton, this.achievementIcon, 105, 103, -369.5, -18, sx, sy);
-        this.placeArtButton(this.homeButton, this.homeIcon, 100, 104, 3, -17.5, sx, sy);
-        this.placeArtButton(this.leaderboardButton, this.leaderboardIcon, 96, 102, 360, -17.5, sx, sy);
+        this.placeArtButton(this.achievementButton, this.achievementIcon, 'leaderboard', -369.5, 0, sx, sy);
+        this.placeArtButton(this.homeButton, this.homeIcon, 'home', 3, 0, sx, sy);
+        this.placeArtButton(this.leaderboardButton, this.leaderboardIcon, 'achievement', 360, 0, sx, sy);
     }
 
     private placeArtButton(
         button: Button | null,
         icon: Node | null,
-        width: number,
-        height: number,
+        tab: NavTab,
         x: number,
         y: number,
         sx: number,
         sy: number,
     ): void {
-        if (!button || !icon) return;
+        const art = this.tabArt(tab);
+        if (!button || !icon || !art) return;
+        const selected = this.selected === tab;
+        const uuid = selected ? art.selected : art.idle;
+        const width = selected ? art.selectedW : art.idleW;
+        const height = selected ? art.selectedH : art.idleH;
+        this.paintArt(icon, uuid, width * sx, height * sy);
         const graphics = button.node.getComponent(Graphics);
         if (graphics) {
             graphics.clear();
