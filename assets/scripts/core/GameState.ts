@@ -29,6 +29,8 @@ export class GameState {
     public levelCompleted = false;
     public level: LevelConfig | null = null;
     public board: BoardData | null = null;
+    /** Answer cells as "row,col". Membership only; placement order is free. */
+    public answerCells = new Set<string>();
 
     public resetForLevel(level: LevelConfig, board: BoardData, maxLives: number): void {
         this.level = level;
@@ -39,6 +41,7 @@ export class GameState {
         this.elapsedTime = 0;
         this.levelCompleted = false;
         this.score = 0;
+        this.answerCells = new Set();
     }
 
     public getSuspectCount(): number {

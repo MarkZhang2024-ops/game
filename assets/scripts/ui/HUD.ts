@@ -112,7 +112,7 @@ export class HUD extends Component {
         this.bound = true;
 
         const settingButton = findDeep(top, 'SettingButton');
-        if (settingButton) settingButton.active = true;
+        if (settingButton) settingButton.active = false;
         settingButton?.on(Node.EventType.TOUCH_END, () => this.cb?.onSettingsPressed());
         findDeep(top, 'BackButton')?.on(Node.EventType.TOUCH_END, () => this.cb?.onBackPressed());
         findDeep(bottom, 'HintButton')?.on(Node.EventType.TOUCH_END, () => {

@@ -43,11 +43,14 @@ const NAME_X_HEIGHT = 29;
 const NAME_GAP = 5 / 32;
 const AVATAR_W = 249;
 const AVATAR_H = 243;
-/** Cream gap between avatar sprites on the profile comp. Same value for every pair. */
-const AVATAR_GAP_X = 9;
-const AVATAR_GAP_Y = 12;
-const AVATAR_ORIGIN_X = -251.5;
-const AVATAR_ORIGIN_Y = 88.5;
+/**
+ * Cream between the outer rings on the profile comp.
+ * Horizontal pairs measure 22px, the two rows measure 26px.
+ */
+const AVATAR_GAP_X = 22;
+const AVATAR_GAP_Y = 26;
+const AVATAR_ORIGIN_X = -268.5;
+const AVATAR_ORIGIN_Y = 94;
 const NAME_COLOR = new Color(92, 42, 24, 255);
 const NAME_LIMIT = 12;
 

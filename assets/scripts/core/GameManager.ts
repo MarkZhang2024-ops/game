@@ -35,7 +35,7 @@ import { GameOver } from '../ui/GameOver';
 import { SettingsPanel } from '../ui/SettingsPanel';
 import { PuzzleSolver } from '../puzzle/PuzzleSolver';
 import { findUniqueNextMoves } from '../puzzle/UniqueReasoning';
-import { createBoardData, cloneBoard, countSuspects, BoardData } from '../puzzle/PuzzleTypes';
+import { createBoardData, cloneBoard, countSuspects, BoardData, LevelConfig } from '../puzzle/PuzzleTypes';
 import { GAME, CellMarkState, SuspectType } from '../utils/Constants';
 import { RewardedAd } from './RewardedAd';
 import { UserService } from '../data/UserService';
@@ -243,7 +243,7 @@ export class GameManager extends Component {
         if (!PuzzleSolver.inBounds(board, row, col)) return;
 
         const cellView = this.board.getCell(row, col);
-        if (cellView?.getSuspectType() === SuspectType.SYSTEM) {
+        if (cellView?.isLocked() || cellView?.getSuspectType() === SuspectType.SYSTEM) {
             this.clearClickTimer();
             return;
         }
@@ -330,15 +330,11 @@ export class GameManager extends Component {
         if (!board || !view) return;
         const cell = view.getCell(row, col);
         if (!cell) return;
-        if (cell.getSuspectType() === SuspectType.SYSTEM) return;
+        if (cell.isLocked() || cell.getSuspectType() === SuspectType.SYSTEM) return;
         if (cell.getMarkState() === CellMarkState.SUSPECT) return;
 
-        if (this.isNewSuspectRuleEnabled()) {
-            this.placeUniqueNextSuspect(row, col);
-            return;
-        }
-
-        if (!PuzzleSolver.canPlace(board, row, col)) {
+        if (!this.isAnswerCell(row, col)) {
+            cell.markPenalty();
             view.shakeCell(row, col);
             this.loseLife();
             return;
@@ -348,18 +344,36 @@ export class GameManager extends Component {
         data.hasSuspect = true;
         cell.setMarkState(CellMarkState.SUSPECT, SuspectType.PLAYER, true);
         this.refreshProgress();
+        if (this.isNewSuspectRuleEnabled()) this.syncNextUniqueMove();
         if (PuzzleSolver.isComplete(board)) {
             this.onLevelCompleted();
         }
     }
 
+    /** True when this cell belongs to the level answer. Order among answer cells is free. */
+    private isAnswerCell(row: number, col: number): boolean {
+        return this.state.answerCells.has(`${row},${col}`);
+    }
+
+    private rememberAnswer(level: LevelConfig, board: BoardData): void {
+        const listed = level.solution
+            ?? level.solutionPath?.map((step) => ({ row: step.row, col: step.col }))
+            ?? PuzzleSolver.solve(board)
+            ?? [];
+        this.state.answerCells = new Set(listed.map((cell) => `${cell.row},${cell.col}`));
+    }
+
+    private openLevel(level: LevelConfig): void {
+        const board = createBoardData(level);
+        this.state.resetForLevel(level, board, GAME.maxLives);
+        this.rememberAnswer(level, board);
+        this.renderLevel();
+    }
+
     private loadCurrentLevel(): void {
         this.hideHintEmptyBanner();
         this.dismissRuleHint();
-        const level = this.levelManager.loadCurrentLevel();
-        const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives);
-        this.renderLevel();
+        this.openLevel(this.levelManager.loadCurrentLevel());
     }
 
     private restartLevel(): void {
@@ -370,10 +384,7 @@ export class GameManager extends Component {
         this.hideHintEmptyBanner();
         this.dismissRuleHint();
         this.timerEnabled = true;
-        const level = this.levelManager.restartLevel();
-        const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives);
-        this.renderLevel();
+        this.openLevel(this.levelManager.restartLevel());
     }
 
     private nextLevel(): void {
@@ -381,10 +392,7 @@ export class GameManager extends Component {
         this.levelComplete?.hide();
         this.hideHintEmptyBanner();
         this.dismissRuleHint();
-        const level = this.levelManager.nextLevel();
-        const board = createBoardData(level);
-        this.state.resetForLevel(level, board, GAME.maxLives);
-        this.renderLevel();
+        this.openLevel(this.levelManager.nextLevel());
     }
 
     private renderLevel(): void {
@@ -449,29 +457,6 @@ export class GameManager extends Component {
         }
         const moves = findUniqueNextMoves(board);
         this.nextUniqueMove = moves.length === 1 ? moves[0] : null;
-    }
-
-    private placeUniqueNextSuspect(row: number, col: number): void {
-        const board = this.state.board;
-        const view = this.board;
-        if (!board || !view) return;
-        const cell = view.getCell(row, col);
-        if (!cell) return;
-        this.syncNextUniqueMove();
-        const move = this.nextUniqueMove;
-        const colorId = board.cells[row][col].color;
-        if (!move || row !== move.row || col !== move.col || colorId !== move.colorId) {
-            view.shakeCell(row, col);
-            this.loseLife();
-            return;
-        }
-        board.cells[row][col].hasSuspect = true;
-        cell.setMarkState(CellMarkState.SUSPECT, SuspectType.PLAYER, true);
-        this.refreshProgress();
-        this.syncNextUniqueMove();
-        if (PuzzleSolver.isComplete(board)) {
-            this.onLevelCompleted();
-        }
     }
 
     private onTool(): void {

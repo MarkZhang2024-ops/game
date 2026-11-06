@@ -75,13 +75,13 @@ export interface LevelConfig {
     blocked: Position[];
     fixedSuspects: Position[];
     /**
-     * Background chain for levels 1-10. Generation only.
-     * Gameplay and UI must not read this.
+     * Answer cells for levels 1-10, stored in generation order.
+     * Gameplay may test membership. It does not require this order.
      */
     solutionPath?: Array<{ row: number; col: number; value: number }>;
     /** Level 11+ generation seed. Restart replays this seed. */
     seed?: number;
-    /** Full answer. Not used to choose the next click. */
+    /** Full answer. A double-click is correct when its cell is in this set. */
     solution?: SuspectPosition[];
     /** Logic clues for level 11+. They are not drawn on the opening board. */
     initialSuspects?: SuspectPosition[];

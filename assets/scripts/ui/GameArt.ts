@@ -4,7 +4,7 @@
  * because the board is created from code.
  */
 
-import { assetManager, Sprite, SpriteFrame } from 'cc';
+import { assetManager, Size, Sprite, SpriteFrame, Vec2 } from 'cc';
 import { CellColor } from '../puzzle/PuzzleTypes';
 
 const TILE_YELLOW = '519e16e9-1087-4ecd-878f-52afba09a9df@f9941';
@@ -125,4 +125,64 @@ export function applySpriteFrame(sprite: Sprite, uuid: string, onReady?: () => v
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         onReady?.();
     });
+}
+
+interface CapsuleEnds {
+    full: SpriteFrame;
+    open: SpriteFrame;
+}
+
+const capsuleEnds = new WeakMap<Sprite, CapsuleEnds>();
+
+/**
+ * Full bar keeps both round ends. A shorter bar keeps the left cap and a
+ * straight strip of the body, so the right end stays square.
+ */
+function makeCapsuleEnds(source: SpriteFrame): CapsuleEnds {
+    const full = source.clone();
+    const cap = Math.max(1, Math.min(full.rect.width / 2, full.rect.height / 2));
+    full.insetLeft = cap;
+    full.insetRight = cap;
+    full.insetTop = 0;
+    full.insetBottom = 0;
+
+    const open = source.clone();
+    const edge = 4;
+    const cropped = Math.min(full.rect.width, cap + edge * 2);
+    const rect = open.rect.clone();
+    rect.width = cropped;
+    open.rect = rect;
+    open.originalSize = new Size(cropped, rect.height);
+    open.offset = new Vec2(0, 0);
+    const right = Math.max(1, Math.min(edge, cropped - 1));
+    open.insetLeft = Math.min(cap, cropped - right);
+    open.insetRight = right;
+    open.insetTop = 0;
+    open.insetBottom = 0;
+    return { full, open };
+}
+
+/** Capsule bar. The round ends keep their shape; only the middle stretches. */
+export function applyCapsule(sprite: Sprite, uuid: string, onReady?: () => void): void {
+    sprite.type = Sprite.Type.SLICED;
+    sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+    loadSpriteFrame(uuid, (frame) => {
+        if (!sprite.isValid || !frame) return;
+        const ends = makeCapsuleEnds(frame);
+        capsuleEnds.set(sprite, ends);
+        sprite.spriteFrame = ends.full;
+        sprite.type = Sprite.Type.SLICED;
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        onReady?.();
+    });
+}
+
+/** full draws both caps. Otherwise the right end is the straight body. */
+export function setProgressCap(sprite: Sprite, full: boolean): void {
+    const ends = capsuleEnds.get(sprite);
+    if (!sprite.isValid || !ends) return;
+    const next = full ? ends.full : ends.open;
+    if (sprite.spriteFrame !== next) sprite.spriteFrame = next;
+    sprite.type = Sprite.Type.SLICED;
+    sprite.sizeMode = Sprite.SizeMode.CUSTOM;
 }

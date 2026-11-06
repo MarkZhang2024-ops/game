@@ -4,8 +4,8 @@
   "imported": true,
   "uuid": "471162c3-cb94-44f7-9550-f32800756f5f",
   "files": [
-    ".json",
-    ".png"
+    ".jpg",
+    ".json"
   ],
   "subMetas": {
     "6c48a": {
@@ -128,7 +128,7 @@
   "userData": {
     "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
-    "hasAlpha": true,
+    "hasAlpha": false,
     "redirect": "471162c3-cb94-44f7-9550-f32800756f5f@6c48a"
   }
 }

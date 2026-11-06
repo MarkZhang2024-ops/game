@@ -13,7 +13,7 @@ import {
     UITransform,
 } from 'cc';
 import { AchievementData } from '../data/AchievementData';
-import { loadSpriteFrame } from './GameArt';
+import { applyCapsule, applySpriteFrame, loadSpriteFrame, setProgressCap } from './GameArt';
 import { addLabel, applySprite, outline, Palette, uiNode } from './UiKit';
 
 const { ccclass } = _decorator;
@@ -61,11 +61,7 @@ export class AchievementCard extends Component {
     /** Fill length and the count use the same LevelManager result. */
     public setTierProgress(progress: number, _completedText?: string): void {
         this.ensure();
-        const value = Math.max(0, Math.min(1, progress));
-        if (this.fillSprite) {
-            this.fillSprite.node.active = value > 0;
-            this.applyFill(value);
-        }
+        this.applyFill(Math.max(0, Math.min(1, progress)));
         if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
 
@@ -99,17 +95,13 @@ export class AchievementCard extends Component {
         const track = uiNode('Track', 372, 70);
         track.setParent(this.progressRoot);
         const trackSprite = track.addComponent(Sprite);
-        trackSprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        applySprite(trackSprite, BAR_TRACK);
+        applySpriteFrame(trackSprite, BAR_TRACK);
 
         const fill = uiNode('Fill', 328, 54);
         fill.setParent(this.progressRoot);
+        fill.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
         this.fillSprite = fill.addComponent(Sprite);
-        this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        loadSpriteFrame(BAR_FILL, (frame) => {
-            if (!this.fillSprite?.isValid || !frame) return;
-            this.fillSprite.spriteFrame = frame;
-            this.fillSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        applyCapsule(this.fillSprite, BAR_FILL, () => {
             this.applyFill(this.data ? Math.max(0, Math.min(1, this.data.progress)) : 0);
         });
 
@@ -130,9 +122,9 @@ export class AchievementCard extends Component {
         title?.getComponent(UITransform)?.setContentSize(width * 0.7, 88 * (height / 839));
         title?.setPosition(0, height / 2 - 78 * (height / 839), 0);
 
-        // Track art is 425×120 on the 896×876 card. Keep that fraction when the card scales.
+        // Lock the 425×120 art ratio. Card height and width can scale apart.
         const barW = width * (425 / 896);
-        const barH = height * (120 / 876);
+        const barH = barW * (120 / 425);
         if (!this.progressRoot) return;
         this.progressRoot.getComponent(UITransform)?.setContentSize(barW, barH);
         // Green center stays at 0.310 down the card. The capsule sits 2px above the frame.
@@ -142,13 +134,9 @@ export class AchievementCard extends Component {
         track?.getComponent(UITransform)?.setContentSize(barW, barH);
         track?.setPosition(0, 0, 0);
         const fill = this.fillSprite?.node;
-        const innerW = barW * (374 / 425);
-        const innerH = barH * (70 / 120);
-        const fillUt = fill?.getComponent(UITransform);
-        fillUt?.setContentSize(innerW, innerH);
-        fillUt?.setAnchorPoint(0, 0.5);
-        // Green starts 26px in from the left of the 425px frame.
-        fill?.setPosition(-barW / 2 + barW * (26 / 425), barLift, 0);
+        fill?.getComponent(UITransform)?.setAnchorPoint(0, 0.5);
+        // 进度条1 sits in the inner well of 进度条2, 25px from the left of the 425px frame.
+        fill?.setPosition(-barW / 2 + barW * (25 / 425), barLift, 0);
         this.countRoot?.setPosition(0, barLift, 0);
         if (this.data) this.paintCount(this.data.completed, this.data.total);
     }
@@ -162,16 +150,25 @@ export class AchievementCard extends Component {
         this.loadImage(this.data.image);
     }
 
-    /** FILLED reads the frame size, so the fill is only set once the frame has loaded. */
+    /**
+     * 进度条2 and 进度条1 share one scale, so their corners stay matched.
+     * Below a full bar the right end is square. At 100% both ends stay round.
+     */
     private applyFill(value: number): void {
         const sprite = this.fillSprite;
-        if (!sprite || !sprite.spriteFrame) return;
-        if (sprite.type !== Sprite.Type.FILLED) {
-            sprite.type = Sprite.Type.FILLED;
-            sprite.fillType = Sprite.FillType.HORIZONTAL;
-            sprite.fillStart = 0;
-        }
-        sprite.fillRange = value;
+        const fill = sprite?.node;
+        const track = this.progressRoot?.getChildByName('Track')?.getComponent(UITransform);
+        if (!sprite?.isValid || !fill || !track) return;
+        const ratio = Math.max(0, Math.min(1, value));
+        const scale = track.width / 425;
+        const fillH = 70 * scale;
+        const fillW = 374 * scale * ratio;
+        const ut = fill.getComponent(UITransform) ?? fill.addComponent(UITransform);
+        ut.setAnchorPoint(0, 0.5);
+        fill.active = fillW > 0.5;
+        if (!fill.active) return;
+        ut.setContentSize(fillW, fillH);
+        setProgressCap(sprite, ratio >= 1);
     }
 
     private paintCount(completed: number, total: number): void {

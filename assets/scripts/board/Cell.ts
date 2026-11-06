@@ -176,11 +176,22 @@ export class Cell extends Component {
         return this.suspectType;
     }
 
+    /** Wrong double-click. Leaves a permanent X that later clicks cannot change. */
+    public markPenalty(): void {
+        if (this.locked) return;
+        this.markState = CellMarkState.X;
+        this.suspectType = SuspectType.NONE;
+        this.hasSuspect = false;
+        this.locked = true;
+        this.refreshMarkUI();
+    }
+
     public setMarkState(
         state: CellMarkState,
         suspectType: SuspectType = SuspectType.NONE,
         animate = false
     ): void {
+        if (this.locked) return;
         if (this.suspectType === SuspectType.SYSTEM && state !== CellMarkState.SUSPECT) {
             return;
         }

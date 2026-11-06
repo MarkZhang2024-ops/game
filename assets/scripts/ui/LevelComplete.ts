@@ -14,7 +14,7 @@ import {
 } from 'cc';
 import { LevelManager } from '../core/LevelManager';
 import { SaveManager } from '../core/SaveManager';
-import { applySpriteFrame } from './GameArt';
+import { applyCapsule, applySpriteFrame, setProgressCap } from './GameArt';
 import { findDeep, GAME_UI } from './GamePageLayout';
 import { whiteFrame } from './UiKit';
 
@@ -41,6 +41,8 @@ export class LevelComplete extends Component {
     private countLabel: Label | null = null;
     private fillSprite: Sprite | null = null;
     private fillRange = 0;
+    private barScale = 1;
+    private grooveW = 0;
     private streak = 0;
     private step = 1;
     private total = 1;
@@ -155,14 +157,11 @@ export class LevelComplete extends Component {
         const track = progress?.getChildByName('Track');
         const fill = progress?.getChildByName('Fill');
         const lens = progress?.getChildByName('Lens');
-        if (track) this.paint(track, WIN_BAR_TRACK);
+        if (track) this.paintCapsule(track, WIN_BAR_TRACK);
         if (fill) {
-            this.paint(fill, WIN_BAR_FILL, (sprite) => {
+            this.paintCapsule(fill, WIN_BAR_FILL, (sprite) => {
                 this.fillSprite = sprite;
-                sprite.type = Sprite.Type.FILLED;
-                sprite.fillType = Sprite.FillType.HORIZONTAL;
-                sprite.fillStart = 0;
-                sprite.fillRange = this.fillRange;
+                this.syncFill();
             });
         }
         if (lens) this.paint(lens, WIN_BAR_LENS);
@@ -179,7 +178,7 @@ export class LevelComplete extends Component {
     private applyTexts(): void {
         if (this.streakLabel) this.streakLabel.string = `Current Streak: ${this.streak}`;
         if (this.countLabel) this.countLabel.string = `${this.step}/${this.total}`;
-        if (this.fillSprite && this.fillSprite.isValid) this.fillSprite.fillRange = this.fillRange;
+        this.syncFill();
     }
 
     private place(): void {
@@ -229,19 +228,13 @@ export class LevelComplete extends Component {
         const track = progress?.getChildByName('Track') || null;
         this.placeArt(track, 0, 0, trackW, trackH);
 
-        const rightInset = trackW * 0.055;
-        const leftInset = trackW * (27 / 648);
-        const fillW = trackW - leftInset - rightInset;
-        const fillH = trackH * 0.62;
-        const fill = progress?.getChildByName('Fill') || null;
-        const fillUt = fill?.getComponent(UITransform) || fill?.addComponent(UITransform);
-        if (fillUt) {
-            fillUt.setAnchorPoint(0, 0.5);
-            fillUt.setContentSize(fillW, fillH);
-        }
-        // Track art is 126px tall and the pink capsule sits 5px above the frame center.
+        // One scale for width and height, so a different screen does not squash the capsule.
+        this.barScale = trackW / 648;
+        this.grooveW = trackW * (594 / 648);
         const barLift = trackH * (5 / 126);
-        fill?.setPosition(-trackW / 2 + leftInset, barLift, 0);
+        const fill = progress?.getChildByName('Fill') || null;
+        fill?.setPosition(-trackW / 2 + trackW * (27 / 648), barLift, 0);
+        this.syncFill();
 
         const lensH = trackH * 0.92;
         const lensW = lensH * (86 / 103);
@@ -321,6 +314,26 @@ export class LevelComplete extends Component {
         label.enableOutline = true;
         label.outlineWidth = Math.max(2, Math.round(fontSize * 0.08));
         label.outlineColor = OUTLINE;
+    }
+
+    private syncFill(): void {
+        const sprite = this.fillSprite;
+        const fill = sprite?.node;
+        if (!sprite?.isValid || !fill) return;
+        const artH = sprite.spriteFrame?.rect.height ?? 70;
+        const fillH = artH * this.barScale;
+        const fillW = this.grooveW * this.fillRange;
+        const ut = fill.getComponent(UITransform) || fill.addComponent(UITransform);
+        ut.setAnchorPoint(0, 0.5);
+        fill.active = fillW > 0.5;
+        if (!fill.active) return;
+        ut.setContentSize(fillW, fillH);
+        setProgressCap(sprite, this.fillRange >= 1);
+    }
+
+    private paintCapsule(node: Node, frame: string, onReady?: (sprite: Sprite) => void): void {
+        const sprite = node.getComponent(Sprite) || node.addComponent(Sprite);
+        applyCapsule(sprite, frame, () => onReady?.(sprite));
     }
 
     private paint(node: Node, frame: string, onReady?: (sprite: Sprite) => void): void {
